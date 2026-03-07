@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+librosa
+mutagen
+python-multipart
+pydantic
+reportlab
+google-generativeai
