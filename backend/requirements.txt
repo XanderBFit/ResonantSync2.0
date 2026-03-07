@@ -6,3 +6,10 @@ python-multipart
 pydantic
 reportlab
 google-generativeai
+ffmpeg-python
+google-cloud-storage
+google-cloud-firestore
+pyloudnorm
+soundfile
+firebase-admin
+

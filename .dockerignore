@@ -1,0 +1,17 @@
+# Exclude dev artifacts
+**/node_modules
+**/venv
+**/__pycache__
+**/*.pyc
+
+# Exclude old static placeholder files so fresh Vite build always wins
+backend/static/
+
+# Exclude local env and secrets
+.env
+backend/.env
+
+# Exclude git and IDE artifacts
+.git/
+.vscode/
+.idea/

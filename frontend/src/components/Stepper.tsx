@@ -13,10 +13,11 @@ export function Stepper({ currentStep, steps }: StepperProps) {
                 <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-white/10 rounded-full z-0"></div>
 
                 {/* Active Track */}
-                <div
-                    className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-gradient-to-r from-accent-cyan to-accent-purple rounded-full z-0 transition-all duration-500 ease-in-out"
-                    style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
-                ></div>
+                <progress
+                    value={((currentStep - 1) / (steps.length - 1)) * 100}
+                    max="100"
+                    className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 w-full bg-transparent appearance-none rounded-full z-0 progress-bar stepper-progress"
+                />
 
                 {steps.map((step, index) => {
                     const stepNumber = index + 1;
@@ -27,10 +28,10 @@ export function Stepper({ currentStep, steps }: StepperProps) {
                         <div key={step} className="relative z-10 flex flex-col items-center group">
                             <div
                                 className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300 ${isActive
-                                        ? 'bg-bg-primary border-2 border-accent-cyan text-accent-cyan shadow-[0_0_15px_rgba(6,182,212,0.4)] scale-110'
-                                        : isCompleted
-                                            ? 'bg-gradient-to-r from-accent-cyan to-accent-purple text-white border-none'
-                                            : 'bg-bg-primary border border-white/20 text-text-tertiary'
+                                    ? 'bg-bg-primary border-2 border-accent-cyan text-accent-cyan shadow-[0_0_15px_rgba(6,182,212,0.4)] scale-110'
+                                    : isCompleted
+                                        ? 'bg-gradient-to-r from-accent-cyan to-accent-purple text-white border-none'
+                                        : 'bg-bg-primary border border-white/20 text-text-tertiary'
                                     }`}
                             >
                                 {isCompleted ? <CheckCircle2 size={20} /> : stepNumber}

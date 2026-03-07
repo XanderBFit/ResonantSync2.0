@@ -1,6 +1,21 @@
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TBPM, TKEY, TCON, COMM, TSRC, TPUB, TCOM, TXXX, ID3NoHeaderError
 import os
+import ffmpeg
+
+def downmix_to_mp3(input_path: str, output_path: str):
+    """
+    Downmixes any audio file to a 320kbps MP3 copy using ffmpeg.
+    """
+    try:
+        stream = ffmpeg.input(input_path)
+        stream = ffmpeg.output(stream, output_path, audio_bitrate='320k', format='mp3')
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
+        return True
+    except Exception as e:
+        print(f"FFmpeg conversion failed: {e}")
+        return False
+
 
 def strip_metadata(file_path: str):
     """
@@ -60,7 +75,6 @@ def embed_disco_metadata(file_path: str, data: dict):
         audio.save(file_path, v2_version=3) # Saving as v2.3 for best cross-compatibility (DISCO/iTunes)
         return True
     except Exception as e:
-        print(f"Failed to embed metadata: {e}")
         print(f"Failed to embed metadata: {e}")
         return False
 

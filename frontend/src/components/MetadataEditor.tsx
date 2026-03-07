@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { Download, FileText, CheckCircle2, Music, User, Mail, Tag, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle2, Save } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { SpotCheckWaveform } from './SpotCheckWaveform';
 
 export interface AnalyzedData {
     title: string;
@@ -14,243 +17,266 @@ export interface AnalyzedData {
     danceability: number;
     instruments: string[];
     vocalPresence: string;
+    scale: string;
+    lufs?: number;      // Server-measured integrated loudness (ITU-R BS.1770)
     fileId?: string;
+    audioBuffer?: AudioBuffer;
 }
 
 export interface MetadataEditorProps {
-    initialData: AnalyzedData | null;
-    onSave: (data: any) => void;
-    onDownloadOneSheet: () => void;
+    files: AnalyzedData[];
+    onSave: (batch: { fileId: string, metadata: any }[]) => void;
     isProcessing: boolean;
+    onPlayBuffer?: (buffer: AudioBuffer | null) => void;
 }
 
-export function MetadataEditor({ initialData, onSave, onDownloadOneSheet, isProcessing }: MetadataEditorProps) {
-    const [formData, setFormData] = useState({
-        title: initialData?.title || '',
-        artist: initialData?.artist || '',
-        album: initialData?.album || '',
-        genre: initialData?.genre || '',
-        bpm: initialData?.bpm?.toString() || '',
-        key: initialData?.key || '',
-        mood: initialData?.mood || '',
-        energy: initialData?.energy?.toString() || '',
-        valence: initialData?.valence?.toString() || '',
-        danceability: initialData?.danceability?.toString() || '',
-        instruments: initialData?.instruments?.join(', ') || '',
-        vocalPresence: initialData?.vocalPresence || '',
-
-        // DISCO Specific
-        grouping: '',
-        comments: '', // Where sync terms often go
+export function MetadataEditor({ files, onSave, isProcessing, onPlayBuffer }: MetadataEditorProps) {
+    const [bulkMetadata, setBulkMetadata] = useState({
+        artist: files[0]?.artist || '',
+        album: files[0]?.album || '',
+        publisher: '',
         composer: '',
-        publisher: '', // Declared One-Stop Publishing
-        isrc: '',
         contactName: '',
         contactEmail: '',
-        contactPhone: '',
         oneStop: false,
-        explicit: false,
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value, type } = e.target as HTMLInputElement;
-        const checked = (e.target as HTMLInputElement).checked;
-        setFormData(prev => ({
+    const [tracks, setTracks] = useState<Record<string, any>>(() => {
+        const initial: Record<string, any> = {};
+        files.forEach(f => {
+            if (f.fileId) {
+                initial[f.fileId] = {
+                    title: f.title || '',
+                    bpm: f.bpm?.toString() || '',
+                    key: f.key || '',
+                    mood: f.mood || '',
+                    genre: f.genre || '',
+                    instruments: f.instruments?.join(', ') || '',
+                    vocalPresence: f.vocalPresence || '',
+                    isrc: '',
+                };
+            }
+        });
+        return initial;
+    });
+
+    useEffect(() => {
+        const loadTemplate = async () => {
+            if (!auth.currentUser) return;
+            try {
+                const userDoc = await getDoc(doc(db, 'userTemplates', auth.currentUser.uid));
+                if (userDoc.exists()) {
+                    const data = userDoc.data();
+                    setBulkMetadata(prev => ({
+                        ...prev,
+                        publisher: data.publisher || prev.publisher,
+                        composer: data.composer || prev.composer,
+                        contactName: data.contactName || prev.contactName,
+                        contactEmail: data.contactEmail || prev.contactEmail,
+                        oneStop: data.oneStop !== undefined ? data.oneStop : prev.oneStop
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to load template:", err);
+            }
+        };
+        loadTemplate();
+    }, []);
+
+    const handleBulkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type, checked } = e.target;
+        setBulkMetadata(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
     };
 
+    const handleTrackChange = (fileId: string, field: string, value: string) => {
+        setTracks(prev => ({
+            ...prev,
+            [fileId]: { ...prev[fileId], [field]: value }
+        }));
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        const batch = files.map(f => ({
+            fileId: f.fileId!,
+            metadata: {
+                ...bulkMetadata,
+                ...tracks[f.fileId!]
+            }
+        }));
+        onSave(batch);
     };
 
     return (
-        <div className="glass-panel p-8 w-full max-w-4xl mx-auto animate-fade-in relative overflow-hidden">
-
-            {/* Decorative top bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple" />
-
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h2 className="text-3xl font-bold mb-2">Track Editor</h2>
-                    <p className="text-text-secondary">Verify AI analysis and complete DISCO metadata</p>
+        <div className="w-full max-w-5xl mx-auto animate-fade-in space-y-8 pb-20">
+            <div className="glass-panel p-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple" />
+                <div className="mb-8">
+                    <h2 className="text-3xl font-bold mb-2 text-gradient-accent">Batch Metadata</h2>
+                    <p className="text-text-secondary">Apply common attributes to all {files.length} tracks</p>
                 </div>
-                <button
-                    type="button"
-                    onClick={onDownloadOneSheet}
-                    className="glass-button text-accent-purple border-accent-purple/30 hover:border-accent-purple/60 hover:bg-accent-purple/5"
-                >
-                    <FileText size={18} />
-                    Export One-Sheet
-                </button>
-            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-
-                {/* SECTION: AI Extracted / Core Audio */}
-                <section className="p-6 bg-white/5 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-2 mb-4 text-accent-cyan">
-                        <Activity size={20} />
-                        <h3 className="text-xl font-semibold">AI Analysis & Core</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="space-y-1">
+                        <label htmlFor="bulk-artist" className="block text-sm font-medium text-text-secondary">Artist (Bulk)</label>
+                        <input id="bulk-artist" type="text" name="artist" value={bulkMetadata.artist} onChange={handleBulkChange} className="glass-input" placeholder="Artist Name" title="Collective Artist Name" />
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Title</label>
-                            <input type="text" name="title" value={formData.title} onChange={handleChange} className="glass-input" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Artist</label>
-                            <input type="text" name="artist" value={formData.artist} onChange={handleChange} className="glass-input" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Album / EP</label>
-                            <input type="text" name="album" value={formData.album} onChange={handleChange} className="glass-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Genre</label>
-                            <input type="text" name="genre" value={formData.genre} onChange={handleChange} className="glass-input" />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">BPM</label>
-                                <div className="relative">
-                                    <input type="number" name="bpm" value={formData.bpm} onChange={handleChange} className="glass-input pl-8" />
-                                    <Music className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-accent-cyan w-4 h-4 opacity-70" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Key</label>
-                                <input type="text" name="key" value={formData.key} onChange={handleChange} className="glass-input border-accent-cyan/30 bg-accent-cyan/5 text-accent-cyan font-semibold" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Mood</label>
-                            <input type="text" name="mood" value={formData.mood} onChange={handleChange} className="glass-input" placeholder="e.g. Uplifting, Dark, Energetic" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Instruments</label>
-                            <input type="text" name="instruments" value={formData.instruments} onChange={handleChange} className="glass-input" placeholder="e.g. Synth, 808, Electric Guitar" />
-                        </div>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Energy</label>
-                                <input type="text" name="energy" value={formData.energy} onChange={handleChange} className="glass-input" placeholder="0.85" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Valence</label>
-                                <input type="number" step="0.01" name="valence" value={formData.valence} onChange={handleChange} className="glass-input" placeholder="0.45" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Danceability</label>
-                                <input type="number" step="0.01" name="danceability" value={formData.danceability} onChange={handleChange} className="glass-input" placeholder="0.9" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text-secondary mb-1">Vocal</label>
-                                <input type="text" name="vocalPresence" value={formData.vocalPresence} onChange={handleChange} className="glass-input" placeholder="Instrumental" />
-                            </div>
-                        </div>
+                    <div className="space-y-1">
+                        <label htmlFor="bulk-album" className="block text-sm font-medium text-text-secondary">Album (Bulk)</label>
+                        <input id="bulk-album" type="text" name="album" value={bulkMetadata.album} onChange={handleBulkChange} className="glass-input" placeholder="Album Title" title="Collective Album Title" />
                     </div>
-                </section>
-
-                {/* SECTION: DISCO & Sync */}
-                <section className="p-6 bg-white/5 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-2 mb-4 text-accent-blue">
-                        <Tag size={20} />
-                        <h3 className="text-xl font-semibold">Sync & Publishing (DISCO)</h3>
+                    <div className="space-y-1">
+                        <label htmlFor="bulk-publisher" className="block text-sm font-medium text-text-secondary">Publisher (Bulk)</label>
+                        <input id="bulk-publisher" type="text" name="publisher" value={bulkMetadata.publisher} onChange={handleBulkChange} className="glass-input" placeholder="Publisher Entity" title="Music Publisher" />
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Composer(s)</label>
-                            <input type="text" name="composer" value={formData.composer} onChange={handleChange} className="glass-input" placeholder="Writers splits..." />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Publisher</label>
-                            <input type="text" name="publisher" value={formData.publisher} onChange={handleChange} className="glass-input" placeholder="Publishing entities..." />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Grouping / Tags</label>
-                            <input type="text" name="grouping" value={formData.grouping} onChange={handleChange} className="glass-input" placeholder="e.g. For Fans Of, Similar Artists..." />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Comments (Sync Terms & Story)</label>
-                            <textarea name="comments" value={formData.comments} onChange={handleChange} rows={3} className="glass-input resize-none" placeholder="Add descriptions, sync notable placements, or 'One-Stop' info here..."></textarea>
-                        </div>
+                    <div className="space-y-1">
+                        <label htmlFor="bulk-composer" className="block text-sm font-medium text-text-secondary">Composer (Bulk)</label>
+                        <input id="bulk-composer" type="text" name="composer" value={bulkMetadata.composer} onChange={handleBulkChange} className="glass-input" placeholder="Composer Names" title="Musical Composers" />
                     </div>
-
-                    <div className="flex items-center gap-6">
+                    <div className="space-y-1">
+                        <label htmlFor="bulk-contact" className="block text-sm font-medium text-text-secondary">Contact Name</label>
+                        <input id="bulk-contact" type="text" name="contactName" value={bulkMetadata.contactName} onChange={handleBulkChange} className="glass-input" placeholder="Contact Person" title="Point of Contact" />
+                    </div>
+                    <div className="flex items-center gap-6 mt-6">
                         <label className="flex items-center gap-2 cursor-pointer group">
                             <div className="relative flex items-center justify-center w-5 h-5 rounded border border-white/20 group-hover:border-accent-blue transition-colors bg-black/20">
-                                <input type="checkbox" name="oneStop" checked={formData.oneStop} onChange={handleChange} className="opacity-0 absolute" />
-                                {formData.oneStop && <CheckCircle2 className="text-accent-blue w-4 h-4" />}
+                                <input type="checkbox" name="oneStop" checked={bulkMetadata.oneStop} onChange={handleBulkChange} className="opacity-0 absolute" />
+                                {bulkMetadata.oneStop && <CheckCircle2 className="text-accent-blue w-4 h-4" />}
                             </div>
-                            <span className="text-sm font-medium text-white group-hover:text-accent-blue transition-colors">Declared One-Stop</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                            <div className="relative flex items-center justify-center w-5 h-5 rounded border border-white/20 group-hover:border-red-400 transition-colors bg-black/20">
-                                <input type="checkbox" name="explicit" checked={formData.explicit} onChange={handleChange} className="opacity-0 absolute" />
-                                {formData.explicit && <CheckCircle2 className="text-red-400 w-4 h-4" />}
-                            </div>
-                            <span className="text-sm font-medium text-white group-hover:text-red-400 transition-colors">Explicit Content</span>
+                            <span className="text-sm font-medium text-white group-hover:text-accent-blue transition-colors">One-Stop</span>
                         </label>
                     </div>
-                </section>
+                </div>
+            </div>
 
-                {/* SECTION: Contact Details */}
-                <section className="p-6 bg-white/5 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-2 mb-4 text-accent-purple">
-                        <User size={20} />
-                        <h3 className="text-xl font-semibold">Contact Information</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Name</label>
-                            <div className="relative">
-                                <input type="text" name="contactName" value={formData.contactName} onChange={handleChange} className="glass-input pl-9" placeholder="Rep Name" />
-                                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary w-4 h-4 opacity-50" />
+            <div className="space-y-4">
+                <h3 className="text-xl font-semibold px-2">Individual Tracks</h3>
+                {files.map((file) => {
+                    const trackData = tracks[file.fileId!];
+                    if (!trackData) return null;
+
+                    return (
+                        <div key={file.fileId} className="glass-panel p-6 border-white/5 bg-white/5 hover:bg-white/[0.07] transition-colors">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                                <div className="lg:w-1/3">
+                                    <div className="mb-4">
+                                        <div className="min-w-0 mb-3">
+                                            <input
+                                                type="text"
+                                                value={trackData.title}
+                                                onChange={(e) => handleTrackChange(file.fileId!, 'title', e.target.value)}
+                                                className="bg-transparent border-none p-0 text-xl font-bold focus:ring-0 w-full placeholder:opacity-50 text-gradient-accent"
+                                                placeholder="Track Title"
+                                                title="Track Title"
+                                            />
+                                            <p className="text-[10px] text-text-secondary truncate opacity-60 uppercase tracking-tighter">ID: {file.fileId}</p>
+                                        </div>
+
+                                        {file.audioBuffer && (
+                                            <SpotCheckWaveform
+                                                audioBuffer={file.audioBuffer}
+                                                onPlayStateChange={(playing) => {
+                                                    if (playing) onPlayBuffer?.(file.audioBuffer!);
+                                                    else onPlayBuffer?.(null);
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] uppercase tracking-wider text-text-secondary">BPM</label>
+                                            <input
+                                                type="text"
+                                                value={trackData.bpm}
+                                                onChange={(e) => handleTrackChange(file.fileId!, 'bpm', e.target.value)}
+                                                className="glass-input py-1 text-sm border-accent-cyan/20"
+                                                title="Beats Per Minute"
+                                                placeholder="BPM"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] uppercase tracking-wider text-text-secondary">Key</label>
+                                            <input
+                                                type="text"
+                                                value={trackData.key}
+                                                onChange={(e) => handleTrackChange(file.fileId!, 'key', e.target.value)}
+                                                className="glass-input py-1 text-sm border-accent-cyan/20 text-accent-cyan font-bold"
+                                                title="Musical Key"
+                                                placeholder="Key"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-wider text-text-secondary">Moods</label>
+                                        <input
+                                            type="text"
+                                            value={trackData.mood}
+                                            onChange={(e) => handleTrackChange(file.fileId!, 'mood', e.target.value)}
+                                            className="glass-input py-1 text-sm"
+                                            title="Mood Tags"
+                                            placeholder="e.g. Energetic"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase tracking-wider text-text-secondary">Genre</label>
+                                        <input
+                                            type="text"
+                                            value={trackData.genre}
+                                            onChange={(e) => handleTrackChange(file.fileId!, 'genre', e.target.value)}
+                                            className="glass-input py-1 text-sm"
+                                            title="Genre Tags"
+                                            placeholder="e.g. Cinematic"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] uppercase tracking-wider text-text-secondary">Instruments</label>
+                                        <input
+                                            type="text"
+                                            value={trackData.instruments}
+                                            onChange={(e) => handleTrackChange(file.fileId!, 'instruments', e.target.value)}
+                                            className="glass-input py-1 text-sm"
+                                            title="Instrumentation"
+                                            placeholder="e.g. Strings, Synth"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Email</label>
-                            <div className="relative">
-                                <input type="email" name="contactEmail" value={formData.contactEmail} onChange={handleChange} className="glass-input pl-9" placeholder="email@agency.com" />
-                                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary w-4 h-4 opacity-50" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-text-secondary mb-1">Phone</label>
-                            <input type="tel" name="contactPhone" value={formData.contactPhone} onChange={handleChange} className="glass-input" placeholder="+1 (555) 000-0000" />
-                        </div>
-                    </div>
-                </section>
+                    );
+                })}
+            </div>
 
-                {/* Form Actions */}
-                <div className="pt-6 border-t border-white/10 flex justify-end gap-4">
-                    <button type="button" className="glass-button text-text-secondary hover:text-white">
-                        Cancel
-                    </button>
-                    <button type="submit" disabled={isProcessing} className="glass-button primary min-w-[200px]">
+            <div className="sticky bottom-8 z-50 px-4">
+                <div className="max-w-4xl mx-auto glass-panel p-4 flex justify-between items-center shadow-2xl border-white/10">
+                    <div className="flex items-center gap-4 text-sm text-text-secondary">
+                        <CheckCircle2 className="text-green-400" size={20} />
+                        <span>Ready to embed {files.length} tracks</span>
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isProcessing}
+                        className="glass-button primary min-w-[200px]"
+                    >
                         {isProcessing ? (
-                            <>
+                            <div className="flex items-center gap-2">
                                 <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
-                                Processing MP3...
-                            </>
+                                Embedding All...
+                            </div>
                         ) : (
                             <>
-                                <Download size={18} />
-                                Embed Tags & Download MP3
+                                <Save size={18} />
+                                Embed & Batch Process
                             </>
                         )}
                     </button>
                 </div>
-
-            </form>
+            </div>
         </div>
     );
 }
