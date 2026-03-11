@@ -27,16 +27,6 @@ def download_from_gcs(blob_name: str, dest_file_path: str) -> bool:
         print(f"GCS Download Error: {e}")
         return False
 
-def blob_exists(blob_name: str) -> bool:
-    """Checks if a blob exists in the bucket."""
-    try:
-        bucket = storage_client.bucket(BUCKET_NAME)
-        blob = bucket.blob(blob_name)
-        return blob.exists()
-    except Exception as e:
-        print(f"GCS Exists Check Error: {e}")
-        return False
-
 def find_blob_by_prefix(prefix: str) -> str:
     """Finds the first blob matching a given prefix."""
     try:
