@@ -11,7 +11,6 @@ import zipfile
 import io
 import librosa
 import numpy as np
-import soundfile as sf
 import ffmpeg
 from audio_analyzer import analyze_audio_file
 from metadata_manager import strip_metadata, embed_disco_metadata, read_disco_metadata, downmix_to_mp3
@@ -19,7 +18,7 @@ from one_sheet_generator import generate_one_sheet
 from storage_manager import upload_to_gcs, download_from_gcs, find_blob_by_prefix, blob_exists
 from google.cloud import firestore
 import firebase_admin
-from firebase_admin import credentials, auth as firebase_auth
+from firebase_admin import auth as firebase_auth
 
 # Initialize Firebase Admin with Application Default Credentials (uses Cloud Run service account)
 if not firebase_admin._apps:
@@ -56,7 +55,7 @@ async def verify_token(authorization: str = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 @app.post("/api/analyze")
-async def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None), uid: str = Depends(verify_token)):
+def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None), uid: str = Depends(verify_token)):
     """
     Accepts an audio file, uploads to GCS, strips metadata, and merges local Essentia.js analysis.
     Returns a unique fileId and the analyzed data.
@@ -352,7 +351,7 @@ async def export_zip(fileIds: str):
         headers={"Content-Disposition": f"attachment; filename={batch_name}"}
     )
 @app.post("/api/promos/{file_id}")
-async def generate_promos(file_id: str):
+async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """
     Finds the most energetic section of a track and generates 15s, 30s, and 60s promo cuts.
     """
