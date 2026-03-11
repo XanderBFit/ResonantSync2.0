@@ -1,6 +1,5 @@
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from reportlab.lib import colors
 import os
 
 def generate_one_sheet(file_path: str, data: dict, output_path: str):
