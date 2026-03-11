@@ -1,6 +1,5 @@
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TBPM, TKEY, TCON, COMM, TSRC, TPUB, TCOM, TXXX, ID3NoHeaderError
-import os
 import ffmpeg
 
 def downmix_to_mp3(input_path: str, output_path: str):
