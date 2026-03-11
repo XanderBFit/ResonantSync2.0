@@ -258,7 +258,7 @@ async def get_pitch(pitch_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/download/{file_id}")
-async def download_audio(file_id: str):
+async def download_audio(file_id: str, uid: str = Depends(verify_token)):
     blob_name = f"finalized/{file_id}.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_dl.mp3")
     

@@ -103,6 +103,39 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
         }
     };
 
+    const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+        e.preventDefault();
+        try {
+            const headers = await getAuthHeader();
+            const res = await fetch(url, { headers });
+            if (!res.ok) throw new Error("Download failed");
+
+            const blob = await res.blob();
+            const objectUrl = window.URL.createObjectURL(blob);
+
+            // Try to extract filename from Content-Disposition
+            let filename = 'download.mp3';
+            const contentDisposition = res.headers.get('Content-Disposition');
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match && match[1]) filename = match[1];
+            } else {
+                filename = url.split('/').pop() + '.mp3';
+            }
+
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(objectUrl);
+        } catch (err) {
+            console.error('Download error:', err);
+            addToast('Failed to download file.', 'error');
+        }
+    };
+
     const handleCreatePitch = async () => {
         if (selectedIds.length === 0) return;
         setIsSharing(true);
@@ -250,7 +283,7 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
                             <div className="flex gap-2 mb-4" onClick={e => e.stopPropagation()}>
                                 <a
                                     href={track.downloadUrl}
-                                    download
+                                    onClick={(e) => handleDownload(e, track.downloadUrl)}
                                     className="flex-1 glass-button text-xs py-2 bg-white/5 hover:bg-white/10"
                                 >
                                     MP3
