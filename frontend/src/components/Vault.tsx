@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Music, Database, Share2, Check, X, Trash2, Scissors, Loader2, Download } from 'lucide-react';
 import { useToast, ToastContainer } from './Toast';
 import { getAuthHeader } from '../lib/apiAuth';
@@ -56,12 +56,14 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
         fetchVault();
     }, [uid]);
 
-    const filteredTracks = tracks.filter(t => {
-        const matchesSearch = t.metadata.title?.toLowerCase().includes(search.toLowerCase()) ||
-            t.metadata.artist?.toLowerCase().includes(search.toLowerCase());
-        const matchesMood = selectedMood === 'all' || t.metadata.mood?.toLowerCase().includes(selectedMood.toLowerCase());
-        return matchesSearch && matchesMood;
-    });
+    const filteredTracks = useMemo(() => {
+        return tracks.filter(t => {
+            const matchesSearch = t.metadata.title?.toLowerCase().includes(search.toLowerCase()) ||
+                t.metadata.artist?.toLowerCase().includes(search.toLowerCase());
+            const matchesMood = selectedMood === 'all' || t.metadata.mood?.toLowerCase().includes(selectedMood.toLowerCase());
+            return matchesSearch && matchesMood;
+        });
+    }, [tracks, search, selectedMood]);
 
     const toggleSelect = (id: string) => {
         setSelectedIds(prev =>
