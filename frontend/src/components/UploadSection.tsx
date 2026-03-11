@@ -144,6 +144,7 @@ export function UploadSection({ onFilesAnalyzed, isAnalyzing }: UploadSectionPro
                                         value={track.progress}
                                         max="100"
                                         className={`w-full progress-bar ${track.status === 'error' ? 'error' : ''}`}
+                                        aria-label={`Analysis progress for ${track.file.name}`}
                                     />
                                 </div>
                             ))}

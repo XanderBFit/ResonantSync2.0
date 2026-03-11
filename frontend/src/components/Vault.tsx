@@ -332,6 +332,7 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
                             <button
                                 onClick={() => setSelectedIds([])}
                                 className="glass-button text-text-secondary hover:text-white"
+                                aria-label="Clear selection"
                             >
                                 Clear
                             </button>
@@ -358,6 +359,7 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
                             }}
                             className="absolute top-4 right-4 text-text-secondary hover:text-white"
                             title="Close"
+                            aria-label="Close share overlay"
                         >
                             <X size={24} />
                         </button>
@@ -412,6 +414,7 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
                                             addToast('Link copied to clipboard!', 'success');
                                         }}
                                         className="text-white hover:text-accent-cyan transition-colors"
+                                        aria-label="Copy generated pitch link"
                                     >
                                         Copy
                                     </button>
