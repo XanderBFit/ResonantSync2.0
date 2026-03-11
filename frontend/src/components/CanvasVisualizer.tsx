@@ -55,6 +55,14 @@ export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
         const barCount = 128;
         const mockBars = new Array(barCount).fill(0).map(() => Math.random() * 50);
 
+        // Cache colors to avoid string interpolation and parsing in the animation loop
+        const colors = new Array(barCount / 2).fill('').map((_, i) => {
+            const ratio = i / (barCount / 2);
+            return ratio < 0.5
+                ? `rgba(168, 85, 247, ${0.4 * (1 - ratio)})` // Purple
+                : `rgba(6, 182, 212, ${0.4 * ratio})`;      // Cyan
+        });
+
         const render = () => {
             const width = canvas.width = canvas.offsetWidth;
             const height = canvas.height = canvas.offsetHeight;
@@ -67,30 +75,27 @@ export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
                 analyzer.getByteFrequencyData(dataArray as any);
             }
 
-            const barWidth = width / (barCount / 2); // Show half the spectrum for impact
+            const halfBarCount = barCount / 2;
+            const barWidth = width / halfBarCount; // Show half the spectrum for impact
+            const realHeightMult = height * 0.6 / 255;
+            const mockHeightMult = height * 0.3;
 
-            for (let i = 0; i < barCount / 2; i++) {
+            for (let i = 0; i < halfBarCount; i++) {
                 let h = 0;
 
                 if (dataArray) {
                     // Use real data
-                    h = (dataArray[i] / 255) * height * 0.6;
+                    h = dataArray[i] * realHeightMult;
                 } else {
                     // Fallback to mock
-                    const target = Math.random() * (height * 0.3);
+                    const target = Math.random() * mockHeightMult;
                     mockBars[i] += (target - mockBars[i]) * 0.1;
                     h = mockBars[i];
                 }
 
                 const x = i * barWidth;
-                const ratio = i / (barCount / 2);
 
-                // Color mapping: Low (Purple) -> High (Cyan)
-                const color = ratio < 0.5
-                    ? `rgba(168, 85, 247, ${0.4 * (1 - ratio)})` // Purple
-                    : `rgba(6, 182, 212, ${0.4 * ratio})`;      // Cyan
-
-                ctx.fillStyle = color;
+                ctx.fillStyle = colors[i];
                 ctx.beginPath();
                 ctx.roundRect(x + 2, height - h, barWidth - 4, h, [8, 8, 0, 0]);
                 ctx.fill();
