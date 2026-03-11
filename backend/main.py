@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Response, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import tempfile
@@ -40,14 +41,17 @@ app.add_middleware(
 UPLOAD_DIR = tempfile.gettempdir()
 
 
-async def verify_token(authorization: str = Header(None)) -> str:
+security = HTTPBearer(auto_error=False)
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     """
     Validates Firebase ID token from Authorization: Bearer <token> header.
     Returns the user's UID on success.
     """
-    if not authorization or not authorization.startswith("Bearer "):
+    if not credentials:
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    token = authorization.split(" ", 1)[1]
+
+    token = credentials.credentials
     try:
         decoded = firebase_auth.verify_id_token(token)
         return decoded["uid"]
