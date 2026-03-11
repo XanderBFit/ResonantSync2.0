@@ -197,6 +197,7 @@ async def delete_track(file_id: str, uid: str = Depends(verify_token)):
     """
     Removes a track from Firestore and deletes all associated GCS blobs.
     """
+    file_id = os.path.basename(file_id)
     try:
         doc_ref = db.collection("processedTracks").document(file_id)
         doc = doc_ref.get()
@@ -234,6 +235,7 @@ async def create_pitch(data: dict):
 
 @app.get("/api/pitches/{pitch_id}")
 async def get_pitch(pitch_id: str):
+    pitch_id = os.path.basename(pitch_id)
     try:
         doc = db.collection("pitches").document(pitch_id).get()
         if not doc.exists:
@@ -258,6 +260,7 @@ async def get_pitch(pitch_id: str):
 
 @app.get("/api/download/{file_id}")
 async def download_audio(file_id: str):
+    file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_dl.mp3")
     
@@ -273,6 +276,8 @@ async def download_audio(file_id: str):
 
 @app.get("/api/master/{file_id}/{ext}")
 async def download_master(file_id: str, ext: str):
+    file_id = os.path.basename(file_id)
+    ext = os.path.basename(ext)
     blob_name = f"raw/{file_id}.{ext}"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_master.{ext}")
     
@@ -295,6 +300,7 @@ async def download_master(file_id: str, ext: str):
 
 @app.get("/api/onesheet/{file_id}")
 async def download_onesheet(file_id: str):
+    file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}_OneSheet.pdf"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_sheet.pdf")
     
@@ -305,6 +311,7 @@ async def download_onesheet(file_id: str):
 
 @app.get("/api/tags/{file_id}")
 async def get_tags(file_id: str):
+    file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_tagcheck.mp3")
     
@@ -325,6 +332,9 @@ async def export_zip(fileIds: str):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for fid in ids:
+            fid = os.path.basename(fid.strip())
+            if not fid:
+                continue
             # 1. Add MP3
             mp3_blob = f"finalized/{fid}.mp3"
             mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
@@ -355,6 +365,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """
     Finds the most energetic section of a track and generates 15s, 30s, and 60s promo cuts.
     """
+    file_id = os.path.basename(file_id)
     with tempfile.TemporaryDirectory() as temp_dir:
         # 1. Download the finalized MP3
         mp3_blob = f"finalized/{file_id}.mp3"
@@ -422,6 +433,7 @@ async def download_promo(file_id: str, cut_sec: int):
     """
     Streams a promo cut MP3 for download.
     """
+    file_id = os.path.basename(file_id)
     blob_name = f"promos/{file_id}_{cut_sec}s.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_{cut_sec}s_dl.mp3")
     if not download_from_gcs(blob_name, local_path):
