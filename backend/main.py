@@ -104,7 +104,7 @@ def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None),
 
 
 @app.post("/api/embed")
-async def embed_metadata(
+def embed_metadata(
     fileId: str = Form(...),
     metadata: str = Form(...),
     uid: str = Form(None),
