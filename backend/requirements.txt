@@ -10,6 +10,5 @@ ffmpeg-python
 google-cloud-storage
 google-cloud-firestore
 pyloudnorm
-soundfile
 firebase-admin
 
