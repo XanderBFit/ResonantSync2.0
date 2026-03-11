@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Download, FileText, CheckCircle2, Search, ArrowLeft, Database, Scissors, Loader2 } from 'lucide-react';
+import { getAuthHeader } from '../lib/apiAuth';
 
 interface ProcessingResult {
     fileId: string;
@@ -22,6 +23,37 @@ interface PromoLinks {
 
 export function TagScanner({ results, onStartOver, onGoToVault }: TagScannerProps) {
     const [promoState, setPromoState] = useState<Record<string, { loading: boolean; links?: PromoLinks; error?: string }>>({});
+
+    const handleDownload = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+        e.preventDefault();
+        try {
+            const headers = await getAuthHeader();
+            const res = await fetch(url, { headers });
+            if (!res.ok) throw new Error("Download failed");
+
+            const blob = await res.blob();
+            const objectUrl = window.URL.createObjectURL(blob);
+
+            let filename = 'download.mp3';
+            const contentDisposition = res.headers.get('Content-Disposition');
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match && match[1]) filename = match[1];
+            } else {
+                filename = url.split('/').pop() + '.mp3';
+            }
+
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(objectUrl);
+        } catch (err) {
+            console.error('Download error:', err);
+        }
+    };
 
     const handleGeneratePromos = async (fileId: string) => {
         setPromoState(prev => ({ ...prev, [fileId]: { loading: true } }));
@@ -114,7 +146,7 @@ export function TagScanner({ results, onStartOver, onGoToVault }: TagScannerProp
                                 )}
                                 <a
                                     href={res.downloadUrl}
-                                    download
+                                    onClick={(e) => handleDownload(e, res.downloadUrl)}
                                     className="glass-button primary text-sm flex-1 md:flex-none py-2 min-w-[140px]"
                                     title="Download Pitched 320kbps MP3"
                                 >
