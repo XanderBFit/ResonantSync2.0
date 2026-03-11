@@ -18,7 +18,7 @@ from one_sheet_generator import generate_one_sheet
 from storage_manager import upload_to_gcs, download_from_gcs, find_blob_by_prefix, blob_exists
 from google.cloud import firestore
 import firebase_admin
-from firebase_admin import credentials, auth as firebase_auth
+from firebase_admin import auth as firebase_auth
 
 # Initialize Firebase Admin with Application Default Credentials (uses Cloud Run service account)
 if not firebase_admin._apps:
