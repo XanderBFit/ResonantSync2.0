@@ -11,7 +11,6 @@ import zipfile
 import io
 import librosa
 import numpy as np
-import soundfile as sf
 import ffmpeg
 from audio_analyzer import analyze_audio_file
 from metadata_manager import strip_metadata, embed_disco_metadata, read_disco_metadata, downmix_to_mp3
