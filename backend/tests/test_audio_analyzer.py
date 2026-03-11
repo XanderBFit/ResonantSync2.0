@@ -88,3 +88,62 @@ def test_measure_lufs_exception(mocker):
     result = measure_lufs("dummy_path.wav")
 
     assert result is None
+
+def test_measure_lufs_import_error(mocker):
+    """Test that an ImportError when importing pyloudnorm gracefully returns None."""
+    # Mock builtins.__import__ to raise ImportError when 'pyloudnorm' is imported
+    original_import = __import__
+    def mock_import(name, *args, **kwargs):
+        if name == 'pyloudnorm':
+            raise ImportError("No module named 'pyloudnorm'")
+        return original_import(name, *args, **kwargs)
+
+    mocker.patch('builtins.__import__', side_effect=mock_import)
+
+    result = measure_lufs("dummy_path.wav")
+
+    assert result is None
+
+from audio_analyzer import analyze_audio_file
+
+def test_analyze_audio_file_success(mocker):
+    """Test successful execution of analyze_audio_file."""
+    mocker.patch('audio_analyzer.measure_lufs', return_value=-10.5)
+
+    local_analysis = {"energy": "0.8", "bpm": 120}
+    result = analyze_audio_file("dummy_path.wav", local_analysis)
+
+    assert result["energy"] == "0.8"
+    assert result["bpm"] == 120
+    assert result["lufs"] == -10.5
+
+def test_analyze_audio_file_missing_energy(mocker):
+    """Test analyze_audio_file when energy is missing from local_analysis."""
+    mocker.patch('audio_analyzer.measure_lufs', return_value=-12.0)
+
+    local_analysis = {"bpm": 130}
+    result = analyze_audio_file("dummy_path.wav", local_analysis)
+
+    assert result["energy"] == "0.5"
+    assert result["bpm"] == 130
+    assert result["lufs"] == -12.0
+
+def test_analyze_audio_file_measure_lufs_fails(mocker):
+    """Test analyze_audio_file when measure_lufs returns None."""
+    mocker.patch('audio_analyzer.measure_lufs', return_value=None)
+
+    local_analysis = {"energy": "0.7"}
+    result = analyze_audio_file("dummy_path.wav", local_analysis)
+
+    assert result["energy"] == "0.7"
+    assert result["lufs"] == -14.0
+
+def test_analyze_audio_file_exception(mocker):
+    """Test that an exception during analyze_audio_file gracefully returns None."""
+    # Force an exception by mocking local_analysis.copy to raise one
+    mock_local = mocker.MagicMock()
+    mock_local.copy.side_effect = Exception("Copy failed")
+
+    result = analyze_audio_file("dummy_path.wav", mock_local)
+
+    assert result is None
