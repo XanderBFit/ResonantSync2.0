@@ -15,7 +15,7 @@ import ffmpeg
 from audio_analyzer import analyze_audio_file
 from metadata_manager import strip_metadata, embed_disco_metadata, read_disco_metadata, downmix_to_mp3
 from one_sheet_generator import generate_one_sheet
-from storage_manager import upload_to_gcs, download_from_gcs, find_blob_by_prefix, blob_exists
+from storage_manager import upload_to_gcs, download_from_gcs, find_blob_by_prefix
 from google.cloud import firestore
 import firebase_admin
 from firebase_admin import auth as firebase_auth
