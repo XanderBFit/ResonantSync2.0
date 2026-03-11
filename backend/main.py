@@ -182,6 +182,8 @@ async def embed_metadata(
 
 @app.get("/api/vault")
 async def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
+    if uid != _auth_uid:
+        raise HTTPException(status_code=403, detail="Not authorized to access this vault")
     try:
         docs = db.collection("processedTracks").where("uid", "==", uid).order_by("createdAt", direction=firestore.Query.DESCENDING).stream()
         results = []
@@ -224,9 +226,10 @@ async def delete_track(file_id: str, uid: str = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/pitches")
-async def create_pitch(data: dict):
+async def create_pitch(data: dict, uid: str = Depends(verify_token)):
     # data: { uid, title, clientName, trackIds }
     try:
+        data['uid'] = uid
         data['createdAt'] = firestore.SERVER_TIMESTAMP
         doc_ref = db.collection("pitches").add(data)
         return {"pitchId": doc_ref[1].id}
@@ -352,10 +355,17 @@ async def export_zip(fileIds: str):
         headers={"Content-Disposition": f"attachment; filename={batch_name}"}
     )
 @app.post("/api/promos/{file_id}")
-async def generate_promos(file_id: str):
+async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """
     Finds the most energetic section of a track and generates 15s, 30s, and 60s promo cuts.
     """
+    # Verify ownership
+    doc = db.collection("processedTracks").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Track not found")
+    if doc.to_dict().get("uid") != uid:
+        raise HTTPException(status_code=403, detail="Not authorized to generate promos for this track")
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # 1. Download the finalized MP3
         mp3_blob = f"finalized/{file_id}.mp3"
