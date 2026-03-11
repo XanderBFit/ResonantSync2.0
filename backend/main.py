@@ -59,6 +59,7 @@ def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None),
     """
     Accepts an audio file, uploads to GCS, strips metadata, and merges local Essentia.js analysis.
     Returns a unique fileId and the analyzed data.
+    Note: defined as `def` (not `async def`) to run blocking I/O in FastAPI's external threadpool.
     """
     if not file.filename.lower().endswith(('.mp3', '.wav', '.aiff')):
         raise HTTPException(status_code=400, detail="Invalid file type")
