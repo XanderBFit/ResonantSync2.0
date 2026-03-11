@@ -56,7 +56,7 @@ async def verify_token(authorization: str = Header(None)) -> str:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 @app.post("/api/analyze")
-async def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None), uid: str = Depends(verify_token)):
+def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None), uid: str = Depends(verify_token)):
     """
     Accepts an audio file, uploads to GCS, strips metadata, and merges local Essentia.js analysis.
     Returns a unique fileId and the analyzed data.
