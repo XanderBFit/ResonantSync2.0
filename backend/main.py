@@ -352,7 +352,7 @@ async def export_zip(fileIds: str):
         headers={"Content-Disposition": f"attachment; filename={batch_name}"}
     )
 @app.post("/api/promos/{file_id}")
-async def generate_promos(file_id: str):
+async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """
     Finds the most energetic section of a track and generates 15s, 30s, and 60s promo cuts.
     """
