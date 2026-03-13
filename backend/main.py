@@ -244,12 +244,17 @@ async def get_pitch(pitch_id: str):
         
         # Hydrate tracks
         tracks = []
-        for tid in track_ids:
-            tdoc = db.collection("processedTracks").document(tid).get()
-            if tdoc.exists:
-                tdata = tdoc.to_dict()
-                tdata['id'] = tdoc.id
-                tracks.append(tdata)
+        if track_ids:
+            refs = [db.collection("processedTracks").document(tid) for tid in track_ids]
+            # Firestore get_all supports up to 100 documents per call, so batching is required for larger lists
+            for i in range(0, len(refs), 100):
+                batch_refs = refs[i:i+100]
+                docs = db.get_all(batch_refs)
+                for tdoc in docs:
+                    if tdoc.exists:
+                        tdata = tdoc.to_dict()
+                        tdata['id'] = tdoc.id
+                        tracks.append(tdata)
         
         pitch_data['tracks'] = tracks
         return pitch_data
