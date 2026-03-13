@@ -41,7 +41,7 @@ app.add_middleware(
 UPLOAD_DIR = tempfile.gettempdir()
 
 
-async def verify_token(authorization: str = Header(None)) -> str:
+def verify_token(authorization: str = Header(None)) -> str:
     """
     Validates Firebase ID token from Authorization: Bearer <token> header.
     Returns the user's UID on success.
@@ -194,7 +194,7 @@ async def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/vault/{file_id}")
-async def delete_track(file_id: str, uid: str = Depends(verify_token)):
+def delete_track(file_id: str, uid: str = Depends(verify_token)):
     """
     Removes a track from Firestore and deletes all associated GCS blobs.
     """
