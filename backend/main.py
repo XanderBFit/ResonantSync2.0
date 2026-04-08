@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 import tempfile
 import os
 import shutil
+import asyncio
 import json
 import uuid
 import zipfile
@@ -394,9 +395,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
         title = tags.get("TIT2", "Track").replace("/", "-")
         artist = tags.get("TPE1", "Artist").replace("/", "-")
 
-        result = {}
-
-        for cut_sec in [15, 30, 60]:
+        async def process_cut(cut_sec):
             half = cut_sec / 2
             start = max(0.0, peak_sec - half)
             end = start + cut_sec
@@ -407,24 +406,31 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
                 start = max(0.0, end - cut_sec)
 
             if (end - start) < 5:  # Skip if less than 5s available
-                continue
+                return None
 
             out_path = os.path.join(temp_dir, f"{cut_sec}s.mp3")
             try:
-                (
+                # Offload blocking FFmpeg call to thread pool
+                stream = (
                     ffmpeg
                     .input(local_mp3, ss=start, to=end)
                     .output(out_path, acodec='libmp3lame', audio_bitrate='320k', loglevel='error')
                     .overwrite_output()
-                    .run()
                 )
+                await asyncio.to_thread(stream.run)
             except Exception as e:
                 print(f"ffmpeg cut failed for {cut_sec}s: {e}")
-                continue
+                return None
 
             blob_name = f"promos/{file_id}_{cut_sec}s.mp3"
-            if upload_to_gcs(out_path, blob_name):
-                result[f"{cut_sec}s"] = f"/api/promo-download/{file_id}/{cut_sec}"
+            # Offload blocking GCS upload to thread pool
+            if await asyncio.to_thread(upload_to_gcs, out_path, blob_name):
+                return f"{cut_sec}s", f"/api/promo-download/{file_id}/{cut_sec}"
+            return None
+
+        # Execute all cuts concurrently
+        promo_results = await asyncio.gather(*(process_cut(c) for c in [15, 30, 60]))
+        result = {res[0]: res[1] for res in promo_results if res}
 
     if not result:
         raise HTTPException(status_code=500, detail="Failed to generate any promo cuts")
