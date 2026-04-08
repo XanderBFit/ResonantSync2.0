@@ -10,6 +10,7 @@ import json
 import uuid
 import zipfile
 import io
+from concurrent.futures import ThreadPoolExecutor
 import librosa
 import numpy as np
 import ffmpeg
@@ -330,29 +331,46 @@ async def export_zip(fileIds: str):
     Packages a list of fileIds into a single ZIP file containing MP3s and One-Sheets.
     fileIds should be a comma-separated string.
     """
-    ids = fileIds.split(',')
+    ids = [fid.strip() for fid in fileIds.split(',') if fid.strip()]
     
+    def fetch_track_data(fid):
+        fid = os.path.basename(fid)
+        track_data = {
+            "mp3_temp": None,
+            "pdf_temp": None,
+            "title": "Unknown",
+            "artist": "Unknown"
+        }
+
+        # 1. Download MP3 & Read Metadata
+        mp3_blob = f"finalized/{fid}.mp3"
+        mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
+        if download_from_gcs(mp3_blob, mp3_temp):
+            track_data["mp3_temp"] = mp3_temp
+            tags = read_disco_metadata(mp3_temp)
+            track_data["title"] = tags.get("TIT2", "Unknown").replace("/", "-")
+            track_data["artist"] = tags.get("TPE1", "Unknown").replace("/", "-")
+
+        # 2. Download PDF
+        pdf_blob = f"finalized/{fid}_OneSheet.pdf"
+        pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
+        if download_from_gcs(pdf_blob, pdf_temp):
+            track_data["pdf_temp"] = pdf_temp
+
+        return track_data
+
+    # Fetch all track data in parallel
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(fetch_track_data, ids))
+
     # Create an in-memory ZIP file
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for fid in ids:
-            fid = os.path.basename(fid.strip())
-            if not fid:
-                continue
-            # 1. Add MP3
-            mp3_blob = f"finalized/{fid}.mp3"
-            mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
-            if download_from_gcs(mp3_blob, mp3_temp):
-                tags = read_disco_metadata(mp3_temp)
-                title = tags.get("TIT2", "Unknown").replace("/", "-")
-                artist = tags.get("TPE1", "Unknown").replace("/", "-")
-                zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
-            
-            # 2. Add PDF
-            pdf_blob = f"finalized/{fid}_OneSheet.pdf"
-            pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
-            if download_from_gcs(pdf_blob, pdf_temp):
-                zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
+        for track in results:
+            if track["mp3_temp"]:
+                zip_file.write(track["mp3_temp"], f"{track['title']} - {track['artist']}.mp3")
+            if track["pdf_temp"]:
+                zip_file.write(track["pdf_temp"], f"{track['title']} - {track['artist']} - OneSheet.pdf")
 
     zip_buffer.seek(0)
     
