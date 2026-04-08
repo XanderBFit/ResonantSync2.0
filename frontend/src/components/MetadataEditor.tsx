@@ -3,6 +3,7 @@ import { CheckCircle2, Save } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { SpotCheckWaveform } from './SpotCheckWaveform';
+import type { TrackMetadata } from '../types/track';
 
 export interface AnalyzedData {
     title: string;
@@ -25,7 +26,7 @@ export interface AnalyzedData {
 
 export interface MetadataEditorProps {
     files: AnalyzedData[];
-    onSave: (batch: { fileId: string, metadata: any }[]) => void;
+    onSave: (batch: { fileId: string, metadata: TrackMetadata }[]) => void;
     isProcessing: boolean;
     onPlayBuffer?: (buffer: AudioBuffer | null) => void;
 }
