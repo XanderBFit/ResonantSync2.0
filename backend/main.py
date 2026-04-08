@@ -10,6 +10,7 @@ import json
 import uuid
 import zipfile
 import io
+import asyncio
 import librosa
 import numpy as np
 import ffmpeg
@@ -330,28 +331,56 @@ async def export_zip(fileIds: str):
     Packages a list of fileIds into a single ZIP file containing MP3s and One-Sheets.
     fileIds should be a comma-separated string.
     """
-    ids = fileIds.split(',')
+    ids = [os.path.basename(fid.strip()) for fid in fileIds.split(',') if fid.strip()]
     
+    # 1. Batch fetch metadata from Firestore to avoid N+1 tag reading from files
+    metadata_map = {}
+    if ids:
+        for i in range(0, len(ids), 100):
+            chunk = ids[i:i+100]
+            refs = [db.collection("processedTracks").document(fid) for fid in chunk]
+            docs = db.get_all(refs)
+            for doc in docs:
+                if doc.exists:
+                    metadata_map[doc.id] = doc.to_dict().get("metadata", {})
+
+    # 2. Download files concurrently
+    async def download_track_files(fid):
+        mp3_blob = f"finalized/{fid}.mp3"
+        pdf_blob = f"finalized/{fid}_OneSheet.pdf"
+        mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
+        pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
+
+        # Run downloads in parallel threads
+        mp3_success, pdf_success = await asyncio.gather(
+            asyncio.to_thread(download_from_gcs, mp3_blob, mp3_temp),
+            asyncio.to_thread(download_from_gcs, pdf_blob, pdf_temp)
+        )
+        return fid, (mp3_temp if mp3_success else None), (pdf_temp if pdf_success else None)
+
+    download_results = await asyncio.gather(*[download_track_files(fid) for fid in ids])
+    results_map = {res[0]: (res[1], res[2]) for res in download_results}
+
     # Create an in-memory ZIP file
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for fid in ids:
-            fid = os.path.basename(fid.strip())
-            if not fid:
-                continue
+            metadata = metadata_map.get(fid, {})
+            title = metadata.get("title", "Unknown").replace("/", "-")
+            artist = metadata.get("artist", "Unknown").replace("/", "-")
+
+            mp3_temp, pdf_temp = results_map.get(fid, (None, None))
+
             # 1. Add MP3
-            mp3_blob = f"finalized/{fid}.mp3"
-            mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
-            if download_from_gcs(mp3_blob, mp3_temp):
-                tags = read_disco_metadata(mp3_temp)
-                title = tags.get("TIT2", "Unknown").replace("/", "-")
-                artist = tags.get("TPE1", "Unknown").replace("/", "-")
+            if mp3_temp:
+                if not metadata:
+                    tags = read_disco_metadata(mp3_temp)
+                    title = tags.get("TIT2", "Unknown").replace("/", "-")
+                    artist = tags.get("TPE1", "Unknown").replace("/", "-")
                 zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
             
             # 2. Add PDF
-            pdf_blob = f"finalized/{fid}_OneSheet.pdf"
-            pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
-            if download_from_gcs(pdf_blob, pdf_temp):
+            if pdf_temp:
                 zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
 
     zip_buffer.seek(0)
