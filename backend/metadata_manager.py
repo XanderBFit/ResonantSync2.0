@@ -1,6 +1,9 @@
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, TBPM, TKEY, TCON, COMM, TSRC, TPUB, TCOM, TXXX, ID3NoHeaderError
 import ffmpeg
+import logging
+
+logger = logging.getLogger(__name__)
 
 def downmix_to_mp3(input_path: str, output_path: str):
     """
@@ -12,7 +15,7 @@ def downmix_to_mp3(input_path: str, output_path: str):
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
         return True
     except Exception as e:
-        print(f"FFmpeg conversion failed: {e}")
+        logger.error(f"FFmpeg conversion failed: {e}")
         return False
 
 
@@ -26,7 +29,7 @@ def strip_metadata(file_path: str):
         audio.save()
         return True
     except Exception as e:
-        print(f"Failed to strip metadata: {e}")
+        logger.error(f"Failed to strip metadata: {e}")
         # If no ID3 header exists, that's fine too.
         return False
 
@@ -74,7 +77,7 @@ def embed_disco_metadata(file_path: str, data: dict):
         audio.save(file_path, v2_version=3) # Saving as v2.3 for best cross-compatibility (DISCO/iTunes)
         return True
     except Exception as e:
-        print(f"Failed to embed metadata: {e}")
+        logger.error(f"Failed to embed metadata: {e}")
         return False
 
 def read_disco_metadata(file_path: str) -> dict:
