@@ -111,8 +111,7 @@ def analyze_audio(file: UploadFile = File(...), localAnalysis: str = Form(None),
 def embed_metadata(
     fileId: str = Form(...),
     metadata: str = Form(...),
-    uid: str = Form(None),
-    _uid: str = Depends(verify_token)
+    uid: str = Depends(verify_token)
 ):
     """
     Pulls raw file from GCS, embeds metadata, generates One-Sheet, and uploads results back to GCS.
@@ -159,19 +158,18 @@ def embed_metadata(
         upload_to_gcs(local_mp3_path, final_mp3_blob)
         upload_to_gcs(local_pdf_path, final_pdf_blob)
 
-        # 7. Persistence: Store in Firestore if UID is provided
-        if uid:
-            track_doc = {
-                "uid": uid,
-                "fileId": fileId,
-                "metadata": data,
-                "downloadUrl": f"/api/download/{fileId}",
-                "oneSheetUrl": f"/api/onesheet/{fileId}",
-                "isMaster": ext != '.mp3',
-                "masterUrl": f"/api/master/{fileId}/{ext.replace('.', '')}" if ext != '.mp3' else None,
-                "createdAt": firestore.SERVER_TIMESTAMP
-            }
-            db.collection("processedTracks").document(fileId).set(track_doc)
+        # 7. Persistence: Store in Firestore
+        track_doc = {
+            "uid": uid,
+            "fileId": fileId,
+            "metadata": data,
+            "downloadUrl": f"/api/download/{fileId}",
+            "oneSheetUrl": f"/api/onesheet/{fileId}",
+            "isMaster": ext != '.mp3',
+            "masterUrl": f"/api/master/{fileId}/{ext.replace('.', '')}" if ext != '.mp3' else None,
+            "createdAt": firestore.SERVER_TIMESTAMP
+        }
+        db.collection("processedTracks").document(fileId).set(track_doc)
 
     res = {
         "downloadUrl": f"/api/download/{fileId}",
@@ -228,9 +226,10 @@ async def delete_track(file_id: str, uid: str = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/pitches")
-async def create_pitch(data: dict):
+async def create_pitch(data: dict, uid: str = Depends(verify_token)):
     # data: { uid, title, clientName, trackIds }
     try:
+        data['uid'] = uid
         data['createdAt'] = firestore.SERVER_TIMESTAMP
         doc_ref = db.collection("pitches").add(data)
         return {"pitchId": doc_ref[1].id}
