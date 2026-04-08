@@ -1,15 +1,5 @@
 import { useCallback, useRef } from 'react';
 
-// Essentia is loaded via CDN in index.html — declare the globals here
-declare global {
-    interface Window {
-        EssentiaWASM: any;
-        Essentia: any;
-        EssentiaModel: any;
-    }
-}
-
-
 export interface AnalysisResult {
     bpm: number;
     key: string;
@@ -64,7 +54,7 @@ export function useAudioAnalyzer() {
             // 1. Decode Audio File
             updateProgress(10);
             const arrayBuffer = await file.arrayBuffer();
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
             // Audio data for Essentia (mono)

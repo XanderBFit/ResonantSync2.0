@@ -16,7 +16,7 @@ export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
             return;
         }
 
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const analyzer = audioCtx.createAnalyser();
         analyzer.fftSize = 256;
         const bufferLength = analyzer.frequencyBinCount;
@@ -64,7 +64,7 @@ export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
             const dataArray = dataArrayRef.current;
 
             if (analyzer && dataArray) {
-                analyzer.getByteFrequencyData(dataArray as any);
+                analyzer.getByteFrequencyData(dataArray);
             }
 
             const barWidth = width / (barCount / 2); // Show half the spectrum for impact
