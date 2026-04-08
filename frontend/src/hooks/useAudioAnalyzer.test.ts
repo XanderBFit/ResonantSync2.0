@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useAudioAnalyzer } from './useAudioAnalyzer';
+import { useAudioAnalyzer, type AnalysisResult } from './useAudioAnalyzer';
 
 describe('useAudioAnalyzer', () => {
     // Setup standard mocks
@@ -57,10 +57,12 @@ describe('useAudioAnalyzer', () => {
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
         const onProgress = vi.fn();
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<AnalysisResult | null> | undefined;
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile, onProgress);
         });
+
+        if (!analysisPromise) throw new Error('Analysis promise not initialized');
 
         // Resolve any awaited promises
         await act(async () => {
@@ -99,10 +101,12 @@ describe('useAudioAnalyzer', () => {
         const { result } = renderHook(() => useAudioAnalyzer());
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<AnalysisResult | null> | undefined;
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile);
         });
+
+        if (!analysisPromise) throw new Error('Analysis promise not initialized');
 
         await act(async () => {
             vi.runAllTimers();
@@ -125,10 +129,12 @@ describe('useAudioAnalyzer', () => {
         const { result } = renderHook(() => useAudioAnalyzer());
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<AnalysisResult | null> | undefined;
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile);
         });
+
+        if (!analysisPromise) throw new Error('Analysis promise not initialized');
 
         // Simulate script loading after 1 second
         act(() => {
@@ -157,10 +163,12 @@ describe('useAudioAnalyzer', () => {
         const { result } = renderHook(() => useAudioAnalyzer());
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<AnalysisResult | null> | undefined;
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile);
         });
+
+        if (!analysisPromise) throw new Error('Analysis promise not initialized');
 
         await act(async () => {
             vi.advanceTimersByTime(11000);
