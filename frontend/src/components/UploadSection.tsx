@@ -79,6 +79,7 @@ export function UploadSection({ onFilesAnalyzed, isAnalyzing }: UploadSectionPro
             onFilesAnalyzed(validResults);
         } else {
             setError('Failed to analyze the uploaded tracks.');
+            setProcessingTracks([]);
         }
     };
 

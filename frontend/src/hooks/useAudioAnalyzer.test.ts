@@ -57,7 +57,7 @@ describe('useAudioAnalyzer', () => {
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
         const onProgress = vi.fn();
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<any> = Promise.resolve(null);
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile, onProgress);
         });
@@ -99,7 +99,7 @@ describe('useAudioAnalyzer', () => {
         const { result } = renderHook(() => useAudioAnalyzer());
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<any> = Promise.resolve(null);
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile);
         });
@@ -125,7 +125,7 @@ describe('useAudioAnalyzer', () => {
         const { result } = renderHook(() => useAudioAnalyzer());
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<any> = Promise.resolve(null);
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile);
         });
@@ -157,7 +157,7 @@ describe('useAudioAnalyzer', () => {
         const { result } = renderHook(() => useAudioAnalyzer());
         const mockFile = new File([''], 'test.mp3', { type: 'audio/mp3' });
 
-        let analysisPromise: Promise<any>;
+        let analysisPromise: Promise<any> = Promise.resolve(null);
         act(() => {
             analysisPromise = result.current.analyzeAudio(mockFile);
         });
