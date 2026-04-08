@@ -11,6 +11,17 @@ mock_modules = [
     'google.cloud.firestore',
     'google.cloud.storage',
     'firebase_admin',
+    'reportlab',
+    'reportlab.lib.pagesizes',
+    'reportlab.pdfgen',
+    'numpy',
+    'librosa',
+    'pyloudnorm',
+    'soundfile',
+    'ffmpeg',
+    'mutagen',
+    'mutagen.mp3',
+    'mutagen.id3',
 ]
 
 for module in mock_modules:
