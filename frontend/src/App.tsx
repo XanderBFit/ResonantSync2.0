@@ -12,6 +12,7 @@ import { CanvasVisualizer } from './components/CanvasVisualizer';
 import { Vault } from './components/Vault';
 import { PitchView } from './components/PitchView';
 import { useToast, ToastContainer } from './components/Toast';
+import { type AnalysisResult } from './hooks/useAudioAnalyzer';
 
 function App() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -47,7 +48,7 @@ function App() {
 
     const steps = ['Upload Master', 'Review & Tag', 'Download Assets'];
 
-    const handleBatchAnalyzed = async (batch: { file: File, analysis: any }[]) => {
+    const handleBatchAnalyzed = async (batch: { file: File, analysis: AnalysisResult }[]) => {
         setIsAnalyzing(true);
         try {
             const token = await auth.currentUser?.getIdToken();
