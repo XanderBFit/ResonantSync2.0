@@ -16,7 +16,7 @@ export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
             return;
         }
 
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const analyzer = audioCtx.createAnalyser();
         analyzer.fftSize = 256;
         const bufferLength = analyzer.frequencyBinCount;
