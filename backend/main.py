@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+import logging
 import tempfile
 import os
 import shutil
@@ -25,6 +26,7 @@ from firebase_admin import auth as firebase_auth
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
+logger = logging.getLogger(__name__)
 db = firestore.Client()
 app = FastAPI(title="ResonantCrab API", description="DISCO-Compatible Audio Metadata Engine")
 
@@ -419,7 +421,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
                     .run()
                 )
             except Exception as e:
-                print(f"ffmpeg cut failed for {cut_sec}s: {e}")
+                logger.error(f"ffmpeg cut failed for {cut_sec}s: {e}")
                 continue
 
             blob_name = f"promos/{file_id}_{cut_sec}s.mp3"

@@ -1,5 +1,8 @@
+import logging
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+
+logger = logging.getLogger(__name__)
 
 def generate_one_sheet(file_path: str, data: dict, output_path: str):
     """
@@ -161,5 +164,5 @@ def generate_one_sheet(file_path: str, data: dict, output_path: str):
         c.save()
         return True
     except Exception as e:
-        print(f"Error generating Cinematic One-Sheet: {e}")
+        logger.error(f"Error generating Cinematic One-Sheet: {e}")
         return False
