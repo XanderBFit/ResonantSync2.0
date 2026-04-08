@@ -13,6 +13,7 @@ import io
 import librosa
 import numpy as np
 import ffmpeg
+import logging
 from audio_analyzer import analyze_audio_file
 from metadata_manager import strip_metadata, embed_disco_metadata, read_disco_metadata, downmix_to_mp3
 from one_sheet_generator import generate_one_sheet
@@ -25,6 +26,7 @@ from firebase_admin import auth as firebase_auth
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
+logger = logging.getLogger(__name__)
 db = firestore.Client()
 app = FastAPI(title="ResonantCrab API", description="DISCO-Compatible Audio Metadata Engine")
 
@@ -419,7 +421,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
                     .run()
                 )
             except Exception as e:
-                print(f"ffmpeg cut failed for {cut_sec}s: {e}")
+                logger.error(f"ffmpeg cut failed for {cut_sec}s: {e}")
                 continue
 
             blob_name = f"promos/{file_id}_{cut_sec}s.mp3"
