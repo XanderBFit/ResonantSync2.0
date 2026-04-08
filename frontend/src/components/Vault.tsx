@@ -285,14 +285,13 @@ export function Vault({ uid, onProcessNew }: VaultProps) {
                                     <div className="flex gap-2 animate-in fade-in duration-500">
                                         {(['15s', '30s', '60s'] as const).map(len =>
                                             promo.links?.[len] ? (
-                                                <a
+                                                <button
                                                     key={len}
-                                                    href={promo.links![len]}
-                                                    download
+                                                    onClick={(e) => handleDownload(e, promo.links![len])}
                                                     className="flex-1 glass-button text-xs py-1.5 text-accent-purple border-accent-purple/20 hover:bg-accent-purple/5 flex items-center justify-center gap-1"
                                                 >
                                                     <Download size={11} />{len}
-                                                </a>
+                                                </button>
                                             ) : null
                                         )}
                                     </div>
