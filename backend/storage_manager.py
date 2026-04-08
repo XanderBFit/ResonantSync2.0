@@ -1,4 +1,7 @@
+import logging
 from google.cloud import storage
+
+logger = logging.getLogger(__name__)
 
 BUCKET_NAME = "resonant-crab-audio-storage-b4"
 storage_client = storage.Client()
@@ -11,7 +14,7 @@ def upload_to_gcs(source_file_path: str, blob_name: str) -> bool:
         blob.upload_from_filename(source_file_path)
         return True
     except Exception as e:
-        print(f"GCS Upload Error: {e}")
+        logger.error(f"GCS Upload Error: {e}")
         return False
 
 def download_from_gcs(blob_name: str, dest_file_path: str) -> bool:
@@ -24,7 +27,7 @@ def download_from_gcs(blob_name: str, dest_file_path: str) -> bool:
         blob.download_to_filename(dest_file_path)
         return True
     except Exception as e:
-        print(f"GCS Download Error: {e}")
+        logger.error(f"GCS Download Error: {e}")
         return False
 
 def blob_exists(blob_name: str) -> bool:
@@ -34,7 +37,7 @@ def blob_exists(blob_name: str) -> bool:
         blob = bucket.blob(blob_name)
         return blob.exists()
     except Exception as e:
-        print(f"GCS Exists Check Error: {e}")
+        logger.error(f"GCS Exists Check Error: {e}")
         return False
 
 def find_blob_by_prefix(prefix: str) -> str:
@@ -46,5 +49,5 @@ def find_blob_by_prefix(prefix: str) -> str:
             return blobs[0].name
         return None
     except Exception as e:
-        print(f"GCS Prefix Search Error: {e}")
+        logger.error(f"GCS Prefix Search Error: {e}")
         return None
