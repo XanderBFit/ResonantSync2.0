@@ -107,6 +107,12 @@ var EssentiaExtractor = (function () {
             this.module = EssentiaWASM;
             this.version = this.algorithms.version;
             this.algorithmNames = this.algorithms.algorithmNames;
+            // Internal state for complex_phase onset detection
+            this._complexPhaseState = {
+                prevMagnitudes: null,
+                prevPhases: null,
+                prevPhases2: null
+            };
         }
         /**
          * Decode and returns the audio buffer of a given audio url or blob uri using Web Audio API.
@@ -2254,7 +2260,7 @@ var EssentiaExtractor = (function () {
         Four methods are available:
           - 'HFC', the High Frequency Content detection function which accurately detects percussive events (see HFC algorithm for details).
           - 'complex', the Complex-Domain spectral difference function [1] taking into account changes in magnitude and phase. It emphasizes note onsets either as a result of significant change in energy in the magnitude spectrum, and/or a deviation from the expected phase values in the phase spectrum, caused by a change in pitch.
-          - 'complex_phase', the simplified Complex-Domain spectral difference function [2] taking into account phase changes, weighted by magnitude. TODO:It reacts better on tonal sounds such as bowed string, but tends to over-detect percussive events.
+          - 'complex_phase', the simplified Complex-Domain spectral difference function [2] taking into account phase changes, weighted by magnitude. It reacts better on tonal sounds such as bowed string. Includes magnitude rectification to reduce percussive over-detection.
           - 'flux', the Spectral Flux detection function which characterizes changes in magnitude spectrum. See Flux algorithm for details.
           - 'melflux', the spectral difference function, similar to spectral flux, but using half-rectified energy changes in Mel-frequency bands of the spectrum [3].
           - 'rms', the difference function, measuring the half-rectified change of the RMS of the magnitude spectrum (i.e., measuring overall energy flux) [4]. Check https://essentia.upf.edu/reference/std_OnsetDetection.html for more details.
@@ -2269,6 +2275,34 @@ var EssentiaExtractor = (function () {
         Essentia.prototype.OnsetDetection = function (spectrum, phase, method, sampleRate) {
             if (method === void 0) { method = 'hfc'; }
             if (sampleRate === void 0) { sampleRate = 44100; }
+            if (method.toLowerCase() === 'complex_phase') {
+                var mag = this.vectorToArray(spectrum);
+                var ph = this.vectorToArray(phase);
+                var nBins = mag.length;
+                var odf = 0;
+                if (this._complexPhaseState.prevMagnitudes && this._complexPhaseState.prevPhases) {
+                    for (var i = 0; i < nBins; i++) {
+                        // Only accumulate if magnitude is increasing (Rectified Complex Domain)
+                        if (mag[i] > this._complexPhaseState.prevMagnitudes[i]) {
+                            // Phase prediction: ph[i] - prevPh[i] is the phase change
+                            // Target phase: prevPh[i] + (prevPh[i] - prevPh2[i])
+                            var targetPhase = 2 * this._complexPhaseState.prevPhases[i] - (this._complexPhaseState.prevPhases2 ? this._complexPhaseState.prevPhases2[i] : 0);
+                            var phaseDev = ph[i] - targetPhase;
+                            // Wrap phase deviation to [-PI, PI]
+                            phaseDev = ((phaseDev + Math.PI) % (2 * Math.PI));
+                            if (phaseDev < 0)
+                                phaseDev += 2 * Math.PI;
+                            phaseDev -= Math.PI;
+                            odf += mag[i] * Math.abs(phaseDev);
+                        }
+                    }
+                }
+                // Update state
+                this._complexPhaseState.prevPhases2 = this._complexPhaseState.prevPhases;
+                this._complexPhaseState.prevPhases = ph;
+                this._complexPhaseState.prevMagnitudes = mag;
+                return { onsetDetection: odf };
+            }
             return this.algorithms.OnsetDetection(spectrum, phase, method, sampleRate);
         };
         /**
