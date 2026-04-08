@@ -1,5 +1,8 @@
 import librosa
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 def measure_lufs(file_path: str) -> float | None:
     """
@@ -22,7 +25,7 @@ def measure_lufs(file_path: str) -> float | None:
             return None
         return round(float(loudness), 1)
     except Exception as e:
-        print(f"LUFS measurement failed: {e}")
+        logger.error(f"LUFS measurement failed: {e}")
         return None
 
 def analyze_audio_file(file_path: str, local_analysis: dict = None) -> dict:
@@ -43,5 +46,5 @@ def analyze_audio_file(file_path: str, local_analysis: dict = None) -> dict:
         return result
 
     except Exception as e:
-        print(f"Error analyzing audio: {e}")
+        logger.error(f"Error analyzing audio: {e}")
         return None
