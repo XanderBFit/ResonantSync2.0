@@ -164,7 +164,7 @@ export function useAudioAnalyzer() {
                 audioBuffer
             };
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Audio Analysis Error:", err);
             return null;
         }

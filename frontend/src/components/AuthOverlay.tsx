@@ -27,8 +27,8 @@ export function AuthOverlay({ onClose, onSuccess }: AuthOverlayProps) {
                 await createUserWithEmailAndPassword(auth, email, password);
             }
             onSuccess();
-        } catch (err: any) {
-            setError(err.message || "Authentication failed.");
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "Authentication failed.");
         } finally {
             setIsLoading(false);
         }
