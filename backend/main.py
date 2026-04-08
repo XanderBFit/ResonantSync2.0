@@ -29,9 +29,19 @@ db = firestore.Client()
 app = FastAPI(title="ResonantCrab API", description="DISCO-Compatible Audio Metadata Engine")
 
 # CORS for frontend
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
+else:
+    allowed_origins = [
+        "http://localhost:5173",
+        "https://striking-scout-489504-b4.web.app",
+        "https://striking-scout-489504-b4.firebaseapp.com"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For dev only. Should be restricted in prod.
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
