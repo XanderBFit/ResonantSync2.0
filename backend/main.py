@@ -185,6 +185,8 @@ def embed_metadata(
 
 @app.get("/api/vault")
 async def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
+    if uid != _auth_uid:
+        raise HTTPException(status_code=403, detail="Not authorized to access this vault")
     try:
         docs = db.collection("processedTracks").where("uid", "==", uid).order_by("createdAt", direction=firestore.Query.DESCENDING).stream()
         results = []
