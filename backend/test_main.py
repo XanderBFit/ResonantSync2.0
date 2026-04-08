@@ -1,3 +1,5 @@
+import os
+import tempfile
 from fastapi.testclient import TestClient
 
 # Must import from main after mock setup in conftest if there are global imports
@@ -38,7 +40,5 @@ def test_path_traversal_mitigation_download_audio(mocker):
 
     # We expect "passwd.mp3" not "../../../etc/passwd.mp3"
     assert blob_name == "finalized/passwd.mp3"
-    import os
-    import tempfile
     expected_local_path = os.path.join(tempfile.gettempdir(), "passwd_dl.mp3")
     assert local_path == expected_local_path
