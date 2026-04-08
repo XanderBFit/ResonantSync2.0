@@ -7,7 +7,7 @@ interface CanvasVisualizerProps {
 export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const analyzerRef = useRef<AnalyserNode | null>(null);
-    const dataArrayRef = useRef<Uint8Array | null>(null);
+    const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
     useEffect(() => {
         if (!audioBuffer) {
@@ -64,7 +64,7 @@ export function CanvasVisualizer({ audioBuffer }: CanvasVisualizerProps) {
             const dataArray = dataArrayRef.current;
 
             if (analyzer && dataArray) {
-                analyzer.getByteFrequencyData(dataArray as any);
+                analyzer.getByteFrequencyData(dataArray);
             }
 
             const barWidth = width / (barCount / 2); // Show half the spectrum for impact
