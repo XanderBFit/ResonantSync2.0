@@ -1,3 +1,4 @@
+import textwrap
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
@@ -127,18 +128,13 @@ def generate_one_sheet(file_path: str, data: dict, output_path: str):
         c.setFillColorRGB(0.7, 0.7, 0.8)
         c.setFont("Helvetica-Oblique", 10)
         
-        # Word wrap naive
+        # Word wrap optimized
         comment_text = data.get('comments', 'No additional terms provided for this submission.')
-        words = str(comment_text).split(' ')
-        line = ""
-        for word in words:
-            if (len(line + word) * 5) > (width - 80):
-                c.drawString(40, y, line)
-                line = word + " "
-                y -= 15
-            else:
-                line += word + " "
-        c.drawString(40, y, line)
+        max_chars = (width - 80) // 5
+        wrapped_lines = textwrap.wrap(str(comment_text), width=max_chars, break_long_words=False, replace_whitespace=False)
+        for line in wrapped_lines:
+            c.drawString(40, y, line)
+            y -= 15
 
         # --- FOOTER ---
         c.setFillColorRGB(0.08, 0.08, 0.1)
