@@ -1,11 +1,29 @@
 import { useCallback, useRef } from 'react';
 
+export interface EssentiaInstance {
+    arrayToVector: (data: Float32Array) => unknown;
+    rhythmExtractor2013: (signal: unknown) => { bpm: number };
+    keyExtractor: (signal: unknown) => { key: string; scale: string };
+    Danceability: (signal: unknown) => { danceability: number };
+    Energy: (signal: unknown) => { energy: number };
+    RMS: (signal: unknown) => { rms: number };
+    MSDSpectrogramMusiCNN: (signal: unknown) => unknown;
+}
+
+export interface EssentiaModelInstance {
+    predict: (features: unknown) => Promise<{ dataSync: () => Float32Array }[]>;
+    getLabels: () => string[];
+}
+
 // Essentia is loaded via CDN in index.html — declare the globals here
 declare global {
     interface Window {
-        EssentiaWASM: any;
-        Essentia: any;
-        EssentiaModel: any;
+        EssentiaWASM: () => Promise<unknown>;
+        Essentia: new (wasmModule: unknown) => EssentiaInstance;
+        EssentiaModel: {
+            EssentiaTFInputMusiCNN: new () => EssentiaModelInstance;
+        };
+        webkitAudioContext?: typeof AudioContext;
     }
 }
 
@@ -26,7 +44,7 @@ export interface AnalysisResult {
 }
 
 export function useAudioAnalyzer() {
-    const essentiaRef = useRef<any>(null);
+    const essentiaRef = useRef<EssentiaInstance | null>(null);
 
     /** Polls until both Essentia globals are available (CDN scripts load async). */
     const waitForEssentia = (): Promise<void> => {
@@ -64,7 +82,11 @@ export function useAudioAnalyzer() {
             // 1. Decode Audio File
             updateProgress(10);
             const arrayBuffer = await file.arrayBuffer();
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+                throw new Error('AudioContext not supported in this browser');
+            }
+            const audioContext = new AudioContextClass();
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
             // Audio data for Essentia (mono)
@@ -164,7 +186,7 @@ export function useAudioAnalyzer() {
                 audioBuffer
             };
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Audio Analysis Error:", err);
             return null;
         }
