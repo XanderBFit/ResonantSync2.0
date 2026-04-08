@@ -325,45 +325,66 @@ async def get_tags(file_id: str):
     return read_disco_metadata(local_path)
 
 @app.get("/api/export-zip")
-async def export_zip(fileIds: str):
+async def export_zip(fileIds: str, background_tasks: BackgroundTasks):
     """
     Packages a list of fileIds into a single ZIP file containing MP3s and One-Sheets.
     fileIds should be a comma-separated string.
     """
-    ids = fileIds.split(',')
+    ids = [fid.strip() for fid in fileIds.split(',') if fid.strip()]
     
-    # Create an in-memory ZIP file
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for fid in ids:
-            fid = os.path.basename(fid.strip())
-            if not fid:
-                continue
-            # 1. Add MP3
-            mp3_blob = f"finalized/{fid}.mp3"
-            mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
-            if download_from_gcs(mp3_blob, mp3_temp):
-                tags = read_disco_metadata(mp3_temp)
-                title = tags.get("TIT2", "Unknown").replace("/", "-")
-                artist = tags.get("TPE1", "Unknown").replace("/", "-")
-                zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
-            
-            # 2. Add PDF
-            pdf_blob = f"finalized/{fid}_OneSheet.pdf"
-            pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
-            if download_from_gcs(pdf_blob, pdf_temp):
-                zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
+    if len(ids) > 50:
+        raise HTTPException(status_code=400, detail="Too many files requested. Maximum is 50.")
 
-    zip_buffer.seek(0)
+    # Create a unique temp directory for this request
+    temp_dir = tempfile.mkdtemp()
+    zip_path = os.path.join(temp_dir, f"export_{uuid.uuid4().hex[:6]}.zip")
     
-    # Generate batch name based on first file or timestamp
-    batch_name = f"ResonantCrab_Sync_Package_{uuid.uuid4().hex[:6]}.zip"
-    
-    return Response(
-        zip_buffer.getvalue(),
-        media_type="application/x-zip-compressed",
-        headers={"Content-Disposition": f"attachment; filename={batch_name}"}
-    )
+    try:
+        # Add background task to clean up the entire temp directory
+        background_tasks.add_task(shutil.rmtree, temp_dir, ignore_errors=True)
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for fid in ids:
+                fid = os.path.basename(fid)
+                if not fid:
+                    continue
+
+                # Initialize metadata for each file
+                title = "Unknown"
+                artist = "Unknown"
+
+                # 1. Add MP3
+                mp3_blob = f"finalized/{fid}.mp3"
+                mp3_temp = os.path.join(temp_dir, f"{fid}.mp3")
+                if download_from_gcs(mp3_blob, mp3_temp):
+                    tags = read_disco_metadata(mp3_temp)
+                    title = tags.get("TIT2", "Unknown").replace("/", "-")
+                    artist = tags.get("TPE1", "Unknown").replace("/", "-")
+                    zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
+
+                # 2. Add PDF
+                pdf_blob = f"finalized/{fid}_OneSheet.pdf"
+                pdf_temp = os.path.join(temp_dir, f"{fid}_OneSheet.pdf")
+                if download_from_gcs(pdf_blob, pdf_temp):
+                    zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
+
+        if not os.path.exists(zip_path) or os.path.getsize(zip_path) == 0:
+            raise HTTPException(status_code=404, detail="No files could be gathered for the ZIP.")
+
+        batch_name = f"ResonantCrab_Sync_Package_{uuid.uuid4().hex[:6]}.zip"
+        return FileResponse(
+            zip_path,
+            media_type="application/x-zip-compressed",
+            filename=batch_name
+        )
+    except HTTPException:
+        # Clean up immediately if we fail before returning the response
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
+    except Exception:
+        # Clean up and raise a generic error
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail="Internal server error during ZIP export.")
 @app.post("/api/promos/{file_id}")
 async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """

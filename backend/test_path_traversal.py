@@ -1,5 +1,6 @@
 import os
 import tempfile
+from fastapi import Response
 from fastapi.testclient import TestClient
 from main import app
 
@@ -13,6 +14,11 @@ def test_path_traversal_mitigation_export_zip(mocker):
 
     # We must patch zipfile.ZipFile so it doesn't fail because the files don't actually exist
     mocker.patch("main.zipfile.ZipFile")
+    # Also mock os.path.exists and os.path.getsize for the zip_path
+    mocker.patch("main.os.path.exists", return_value=True)
+    mocker.patch("main.os.path.getsize", return_value=1024)
+    # Mock FileResponse to avoid it trying to access the non-existent zip file
+    mocker.patch("main.FileResponse", return_value=Response(content=b"dummy zip", media_type="application/x-zip-compressed"))
 
     # Send a request with a path traversal payload
     response = client.get("/api/export-zip?fileIds=../../../etc/passwd")
@@ -27,5 +33,5 @@ def test_path_traversal_mitigation_export_zip(mocker):
 
     # We expect "passwd.mp3" not "../../../etc/passwd.mp3"
     assert blob_name == "finalized/passwd.mp3"
-    expected_local_path = os.path.join(tempfile.gettempdir(), "passwd_zip.mp3")
-    assert local_path == expected_local_path
+    # The local path now uses a unique temp dir created with mkdtemp
+    assert local_path.endswith("/passwd.mp3")

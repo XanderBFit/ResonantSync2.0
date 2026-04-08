@@ -23,6 +23,11 @@ def test_path_traversal_mitigation_download_audio(mocker):
     mock_download = mocker.patch("main.download_from_gcs", return_value=True)
     # Mock read_disco_metadata so it doesn't fail trying to read a non-existent file
     mock_read_metadata = mocker.patch("main.read_disco_metadata", return_value={"TIT2": "Test", "TPE1": "Artist"})
+    # Mock FileResponse to avoid it trying to access non-existent files
+    from fastapi.responses import Response
+    mocker.patch("main.FileResponse", return_value=Response(content=b"dummy audio", media_type="audio/mpeg"))
+    # Also mock os.path.exists for the FileResponse check (if any)
+    mocker.patch("main.os.path.exists", return_value=True)
 
     # Send a request with a path traversal payload
     response = client.get("/api/download/../../../etc/passwd")
