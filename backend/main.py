@@ -187,12 +187,7 @@ def embed_metadata(
 async def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
     try:
         docs = db.collection("processedTracks").where("uid", "==", uid).order_by("createdAt", direction=firestore.Query.DESCENDING).stream()
-        results = []
-        for d in docs:
-            data = d.to_dict()
-            data['id'] = d.id
-            results.append(data)
-        return results
+        return [{**d.to_dict(), 'id': d.id} for d in docs]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
