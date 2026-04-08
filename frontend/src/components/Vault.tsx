@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Search, Music, Database, Share2, Check, X, Trash2, Scissors, Loader2, Download } from 'lucide-react';
 import { useToast, ToastContainer } from './Toast';
 import { getAuthHeader } from '../lib/apiAuth';
+import type { TrackMetadata } from '../types/track';
 
 interface VaultItem {
     fileId: string;
-    metadata: any;
+    metadata: TrackMetadata;
     downloadUrl: string;
     oneSheetUrl: string;
     masterUrl?: string;
