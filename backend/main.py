@@ -43,7 +43,7 @@ UPLOAD_DIR = tempfile.gettempdir()
 
 security = HTTPBearer(auto_error=False)
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     """
     Validates Firebase ID token from Authorization: Bearer <token> header.
     Returns the user's UID on success.
@@ -184,7 +184,7 @@ def embed_metadata(
     return res
 
 @app.get("/api/vault")
-async def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
+def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
     try:
         docs = db.collection("processedTracks").where("uid", "==", uid).order_by("createdAt", direction=firestore.Query.DESCENDING).stream()
         results = []
@@ -197,7 +197,7 @@ async def get_vault(uid: str, _auth_uid: str = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/vault/{file_id}")
-async def delete_track(file_id: str, uid: str = Depends(verify_token)):
+def delete_track(file_id: str, uid: str = Depends(verify_token)):
     """
     Removes a track from Firestore and deletes all associated GCS blobs.
     """
@@ -228,7 +228,7 @@ async def delete_track(file_id: str, uid: str = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/pitches")
-async def create_pitch(data: dict):
+def create_pitch(data: dict):
     # data: { uid, title, clientName, trackIds }
     try:
         data['createdAt'] = firestore.SERVER_TIMESTAMP
@@ -238,7 +238,7 @@ async def create_pitch(data: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/pitches/{pitch_id}")
-async def get_pitch(pitch_id: str):
+def get_pitch(pitch_id: str):
     pitch_id = os.path.basename(pitch_id)
     try:
         doc = db.collection("pitches").document(pitch_id).get()
@@ -263,7 +263,7 @@ async def get_pitch(pitch_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/download/{file_id}")
-async def download_audio(file_id: str):
+def download_audio(file_id: str):
     file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_dl.mp3")
@@ -279,7 +279,7 @@ async def download_audio(file_id: str):
     return FileResponse(local_path, media_type="audio/mpeg", filename=formatted_name)
 
 @app.get("/api/master/{file_id}/{ext}")
-async def download_master(file_id: str, ext: str):
+def download_master(file_id: str, ext: str):
     file_id = os.path.basename(file_id)
     ext = os.path.basename(ext)
     blob_name = f"raw/{file_id}.{ext}"
@@ -303,7 +303,7 @@ async def download_master(file_id: str, ext: str):
     return FileResponse(local_path, media_type=f"audio/{ext}", filename=formatted_name)
 
 @app.get("/api/onesheet/{file_id}")
-async def download_onesheet(file_id: str):
+def download_onesheet(file_id: str):
     file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}_OneSheet.pdf"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_sheet.pdf")
@@ -314,7 +314,7 @@ async def download_onesheet(file_id: str):
     return FileResponse(local_path, media_type="application/pdf", filename=f"{file_id}_OneSheet.pdf")
 
 @app.get("/api/tags/{file_id}")
-async def get_tags(file_id: str):
+def get_tags(file_id: str):
     file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_tagcheck.mp3")
@@ -325,7 +325,7 @@ async def get_tags(file_id: str):
     return read_disco_metadata(local_path)
 
 @app.get("/api/export-zip")
-async def export_zip(fileIds: str):
+def export_zip(fileIds: str):
     """
     Packages a list of fileIds into a single ZIP file containing MP3s and One-Sheets.
     fileIds should be a comma-separated string.
@@ -365,7 +365,7 @@ async def export_zip(fileIds: str):
         headers={"Content-Disposition": f"attachment; filename={batch_name}"}
     )
 @app.post("/api/promos/{file_id}")
-async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
+def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """
     Finds the most energetic section of a track and generates 15s, 30s, and 60s promo cuts.
     """
@@ -433,7 +433,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
 
 
 @app.get("/api/promo-download/{file_id}/{cut_sec}")
-async def download_promo(file_id: str, cut_sec: int):
+def download_promo(file_id: str, cut_sec: int):
     """
     Streams a promo cut MP3 for download.
     """
