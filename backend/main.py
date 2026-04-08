@@ -228,9 +228,10 @@ async def delete_track(file_id: str, uid: str = Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/pitches")
-async def create_pitch(data: dict):
-    # data: { uid, title, clientName, trackIds }
+async def create_pitch(data: dict, uid: str = Depends(verify_token)):
+    # data: { title, clientName, trackIds }
     try:
+        data['uid'] = uid
         data['createdAt'] = firestore.SERVER_TIMESTAMP
         doc_ref = db.collection("pitches").add(data)
         return {"pitchId": doc_ref[1].id}
