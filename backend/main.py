@@ -10,6 +10,7 @@ import json
 import uuid
 import zipfile
 import io
+import asyncio
 import librosa
 import numpy as np
 import ffmpeg
@@ -396,7 +397,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
 
         result = {}
 
-        for cut_sec in [15, 30, 60]:
+        def process_cut(cut_sec):
             half = cut_sec / 2
             start = max(0.0, peak_sec - half)
             end = start + cut_sec
@@ -407,7 +408,7 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
                 start = max(0.0, end - cut_sec)
 
             if (end - start) < 5:  # Skip if less than 5s available
-                continue
+                return None
 
             out_path = os.path.join(temp_dir, f"{cut_sec}s.mp3")
             try:
@@ -420,11 +421,20 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
                 )
             except Exception as e:
                 print(f"ffmpeg cut failed for {cut_sec}s: {e}")
-                continue
+                return None
 
             blob_name = f"promos/{file_id}_{cut_sec}s.mp3"
             if upload_to_gcs(out_path, blob_name):
-                result[f"{cut_sec}s"] = f"/api/promo-download/{file_id}/{cut_sec}"
+                return (f"{cut_sec}s", f"/api/promo-download/{file_id}/{cut_sec}")
+            return None
+
+        tasks = [asyncio.to_thread(process_cut, cut_sec) for cut_sec in [15, 30, 60]]
+        cuts = await asyncio.gather(*tasks)
+
+        for cut in cuts:
+            if cut:
+                key, val = cut
+                result[key] = val
 
     if not result:
         raise HTTPException(status_code=500, detail="Failed to generate any promo cuts")
