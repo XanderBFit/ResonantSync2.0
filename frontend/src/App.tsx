@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UploadSection } from './components/UploadSection';
 import { MetadataEditor, type AnalyzedData } from './components/MetadataEditor';
+import { TrackMetadata } from './types/track';
 import { Stepper } from './components/Stepper';
 import { TagScanner } from './components/TagScanner';
 import { AuthOverlay } from './components/AuthOverlay';
@@ -93,7 +94,7 @@ function App() {
         }
     };
 
-    const handleSaveBatchMetadata = async (batchMetadata: any[]) => {
+    const handleSaveBatchMetadata = async (batchMetadata: { fileId: string, metadata: TrackMetadata }[]) => {
         setIsProcessing(true);
         try {
             const token = await auth.currentUser?.getIdToken();
