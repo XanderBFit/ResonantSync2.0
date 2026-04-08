@@ -39,6 +39,7 @@ app.add_middleware(
 
 # Temp storage for processing
 UPLOAD_DIR = tempfile.gettempdir()
+MAX_ZIP_FILES = 50
 
 
 security = HTTPBearer(auto_error=False)
@@ -325,45 +326,63 @@ async def get_tags(file_id: str):
     return read_disco_metadata(local_path)
 
 @app.get("/api/export-zip")
-async def export_zip(fileIds: str):
+async def export_zip(fileIds: str, background_tasks: BackgroundTasks):
     """
     Packages a list of fileIds into a single ZIP file containing MP3s and One-Sheets.
     fileIds should be a comma-separated string.
     """
-    ids = fileIds.split(',')
+    ids = [fid.strip() for fid in fileIds.split(',') if fid.strip()]
     
-    # Create an in-memory ZIP file
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for fid in ids:
-            fid = os.path.basename(fid.strip())
-            if not fid:
-                continue
-            # 1. Add MP3
-            mp3_blob = f"finalized/{fid}.mp3"
-            mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
-            if download_from_gcs(mp3_blob, mp3_temp):
-                tags = read_disco_metadata(mp3_temp)
-                title = tags.get("TIT2", "Unknown").replace("/", "-")
-                artist = tags.get("TPE1", "Unknown").replace("/", "-")
-                zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
-            
-            # 2. Add PDF
-            pdf_blob = f"finalized/{fid}_OneSheet.pdf"
-            pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
-            if download_from_gcs(pdf_blob, pdf_temp):
-                zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
+    if len(ids) > MAX_ZIP_FILES:
+        raise HTTPException(status_code=400, detail=f"Maximum of {MAX_ZIP_FILES} files allowed per ZIP export")
 
-    zip_buffer.seek(0)
+    # Create a temporary file for the ZIP on disk to avoid memory exhaustion
+    fd, zip_path = tempfile.mkstemp(suffix=".zip")
+    os.close(fd)
     
-    # Generate batch name based on first file or timestamp
-    batch_name = f"ResonantCrab_Sync_Package_{uuid.uuid4().hex[:6]}.zip"
-    
-    return Response(
-        zip_buffer.getvalue(),
-        media_type="application/x-zip-compressed",
-        headers={"Content-Disposition": f"attachment; filename={batch_name}"}
-    )
+    try:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                for fid in ids:
+                    fid = os.path.basename(fid)
+
+                    # 1. Add MP3
+                    mp3_blob = f"finalized/{fid}.mp3"
+                    mp3_temp = os.path.join(temp_dir, f"{fid}_zip.mp3")
+
+                    title = "Unknown"
+                    artist = "Unknown"
+
+                    if download_from_gcs(mp3_blob, mp3_temp):
+                        tags = read_disco_metadata(mp3_temp)
+                        title = tags.get("TIT2", "Unknown").replace("/", "-")
+                        artist = tags.get("TPE1", "Unknown").replace("/", "-")
+                        zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
+
+                    # 2. Add PDF
+                    pdf_blob = f"finalized/{fid}_OneSheet.pdf"
+                    pdf_temp = os.path.join(temp_dir, f"{fid}_zip.pdf")
+                    if download_from_gcs(pdf_blob, pdf_temp):
+                        zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
+
+        # Generate batch name
+        batch_name = f"ResonantCrab_Sync_Package_{uuid.uuid4().hex[:6]}.zip"
+
+        # Schedule cleanup of the temporary ZIP file
+        # We use a lambda to ignore errors if the file was already deleted in the except block
+        background_tasks.add_task(lambda p: os.remove(p) if os.path.exists(p) else None, zip_path)
+
+        return FileResponse(
+            zip_path,
+            media_type="application/x-zip-compressed",
+            filename=batch_name
+        )
+    except Exception as e:
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 @app.post("/api/promos/{file_id}")
 async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
     """
