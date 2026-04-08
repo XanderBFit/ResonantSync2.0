@@ -3,29 +3,11 @@ import { CheckCircle2, Save } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { SpotCheckWaveform } from './SpotCheckWaveform';
-
-export interface AnalyzedData {
-    title: string;
-    artist: string;
-    album: string;
-    bpm: number;
-    key: string;
-    mood: string;
-    genre: string;
-    energy: string | number;
-    valence: number;
-    danceability: number;
-    instruments: string[];
-    vocalPresence: string;
-    scale: string;
-    lufs?: number;      // Server-measured integrated loudness (ITU-R BS.1770)
-    fileId?: string;
-    audioBuffer?: AudioBuffer;
-}
+import { type AnalyzedData, type TrackMetadata } from '../types/track';
 
 export interface MetadataEditorProps {
     files: AnalyzedData[];
-    onSave: (batch: { fileId: string, metadata: any }[]) => void;
+    onSave: (batch: { fileId: string, metadata: TrackMetadata }[]) => void;
     isProcessing: boolean;
     onPlayBuffer?: (buffer: AudioBuffer | null) => void;
 }
@@ -41,8 +23,8 @@ export function MetadataEditor({ files, onSave, isProcessing, onPlayBuffer }: Me
         oneStop: false,
     });
 
-    const [tracks, setTracks] = useState<Record<string, any>>(() => {
-        const initial: Record<string, any> = {};
+    const [tracks, setTracks] = useState<Record<string, Partial<TrackMetadata>>>(() => {
+        const initial: Record<string, Partial<TrackMetadata>> = {};
         files.forEach(f => {
             if (f.fileId) {
                 initial[f.fileId] = {
@@ -54,6 +36,7 @@ export function MetadataEditor({ files, onSave, isProcessing, onPlayBuffer }: Me
                     instruments: f.instruments?.join(', ') || '',
                     vocalPresence: f.vocalPresence || '',
                     isrc: '',
+                    scale: f.scale || '',
                 };
             }
         });
@@ -105,7 +88,7 @@ export function MetadataEditor({ files, onSave, isProcessing, onPlayBuffer }: Me
             metadata: {
                 ...bulkMetadata,
                 ...tracks[f.fileId!]
-            }
+            } as TrackMetadata
         }));
         onSave(batch);
     };
