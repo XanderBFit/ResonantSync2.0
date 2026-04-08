@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Download, FileText, Play, Pause, ExternalLink, Mail } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
+import { type TrackMetadata } from '../types/track';
 
 interface PitchData {
     title: string;
     clientName: string;
     tracks: Array<{
         id: string;
-        metadata: any;
+        metadata: TrackMetadata;
         urls: {
             mp3: string;
             oneSheet: string;
