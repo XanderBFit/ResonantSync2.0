@@ -218,9 +218,11 @@ async def delete_track(file_id: str, uid: str = Depends(verify_token)):
         client = storage.Client()
         bucket_name = os.environ.get("GCS_BUCKET", "resonant-crab-audio")
         bucket = client.bucket(bucket_name)
+        blobs_to_delete = []
         for prefix in [f"raw/{file_id}", f"finalized/{file_id}", f"promos/{file_id}"]:
-            for blob in bucket.list_blobs(prefix=prefix):
-                blob.delete()
+            blobs_to_delete.extend(list(bucket.list_blobs(prefix=prefix)))
+        if blobs_to_delete:
+            bucket.delete_blobs(blobs_to_delete)
         return {"status": "deleted", "fileId": file_id}
     except HTTPException:
         raise
