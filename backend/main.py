@@ -263,12 +263,15 @@ async def get_pitch(pitch_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/download/{file_id}")
-async def download_audio(file_id: str):
+async def download_audio(file_id: str, background_tasks: BackgroundTasks):
     file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}.mp3"
-    local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_dl.mp3")
+    tmp_dir = tempfile.mkdtemp()
+    local_path = os.path.join(tmp_dir, f"{file_id}_dl.mp3")
+    background_tasks.add_task(shutil.rmtree, tmp_dir)
     
     if not download_from_gcs(blob_name, local_path):
+        shutil.rmtree(tmp_dir)
         raise HTTPException(status_code=404, detail="MP3 not found in GCS")
         
     tags = read_disco_metadata(local_path)
@@ -279,20 +282,23 @@ async def download_audio(file_id: str):
     return FileResponse(local_path, media_type="audio/mpeg", filename=formatted_name)
 
 @app.get("/api/master/{file_id}/{ext}")
-async def download_master(file_id: str, ext: str):
+async def download_master(file_id: str, ext: str, background_tasks: BackgroundTasks):
     file_id = os.path.basename(file_id)
     ext = os.path.basename(ext)
     blob_name = f"raw/{file_id}.{ext}"
-    local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_master.{ext}")
+    tmp_dir = tempfile.mkdtemp()
+    local_path = os.path.join(tmp_dir, f"{file_id}_master.{ext}")
+    background_tasks.add_task(shutil.rmtree, tmp_dir)
     
     if not download_from_gcs(blob_name, local_path):
+        shutil.rmtree(tmp_dir)
         raise HTTPException(status_code=404, detail="Master file not found in GCS")
         
     # Attempt to get meta from MP3 twin for naming
     title = "Unknown Title"
     artist = "Unknown Artist"
     mp3_blob = f"finalized/{file_id}.mp3"
-    mp3_temp = os.path.join(tempfile.gettempdir(), f"{file_id}_meta.mp3")
+    mp3_temp = os.path.join(tmp_dir, f"{file_id}_meta.mp3")
     
     if download_from_gcs(mp3_blob, mp3_temp):
         tags = read_disco_metadata(mp3_temp)
@@ -303,12 +309,15 @@ async def download_master(file_id: str, ext: str):
     return FileResponse(local_path, media_type=f"audio/{ext}", filename=formatted_name)
 
 @app.get("/api/onesheet/{file_id}")
-async def download_onesheet(file_id: str):
+async def download_onesheet(file_id: str, background_tasks: BackgroundTasks):
     file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}_OneSheet.pdf"
-    local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_sheet.pdf")
+    tmp_dir = tempfile.mkdtemp()
+    local_path = os.path.join(tmp_dir, f"{file_id}_sheet.pdf")
+    background_tasks.add_task(shutil.rmtree, tmp_dir)
     
     if not download_from_gcs(blob_name, local_path):
+        shutil.rmtree(tmp_dir)
         raise HTTPException(status_code=404, detail="One-Sheet not found in GCS")
         
     return FileResponse(local_path, media_type="application/pdf", filename=f"{file_id}_OneSheet.pdf")
@@ -317,12 +326,13 @@ async def download_onesheet(file_id: str):
 async def get_tags(file_id: str):
     file_id = os.path.basename(file_id)
     blob_name = f"finalized/{file_id}.mp3"
-    local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_tagcheck.mp3")
     
-    if not download_from_gcs(blob_name, local_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return read_disco_metadata(local_path)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        local_path = os.path.join(tmp_dir, f"{file_id}_tagcheck.mp3")
+        if not download_from_gcs(blob_name, local_path):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        return read_disco_metadata(local_path)
 
 @app.get("/api/export-zip")
 async def export_zip(fileIds: str):
@@ -334,25 +344,26 @@ async def export_zip(fileIds: str):
     
     # Create an in-memory ZIP file
     zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for fid in ids:
-            fid = os.path.basename(fid.strip())
-            if not fid:
-                continue
-            # 1. Add MP3
-            mp3_blob = f"finalized/{fid}.mp3"
-            mp3_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.mp3")
-            if download_from_gcs(mp3_blob, mp3_temp):
-                tags = read_disco_metadata(mp3_temp)
-                title = tags.get("TIT2", "Unknown").replace("/", "-")
-                artist = tags.get("TPE1", "Unknown").replace("/", "-")
-                zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
-            
-            # 2. Add PDF
-            pdf_blob = f"finalized/{fid}_OneSheet.pdf"
-            pdf_temp = os.path.join(tempfile.gettempdir(), f"{fid}_zip.pdf")
-            if download_from_gcs(pdf_blob, pdf_temp):
-                zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for fid in ids:
+                fid = os.path.basename(fid.strip())
+                if not fid:
+                    continue
+                # 1. Add MP3
+                mp3_blob = f"finalized/{fid}.mp3"
+                mp3_temp = os.path.join(tmp_dir, f"{fid}_zip.mp3")
+                if download_from_gcs(mp3_blob, mp3_temp):
+                    tags = read_disco_metadata(mp3_temp)
+                    title = tags.get("TIT2", "Unknown").replace("/", "-")
+                    artist = tags.get("TPE1", "Unknown").replace("/", "-")
+                    zip_file.write(mp3_temp, f"{title} - {artist}.mp3")
+
+                # 2. Add PDF
+                pdf_blob = f"finalized/{fid}_OneSheet.pdf"
+                pdf_temp = os.path.join(tmp_dir, f"{fid}_zip.pdf")
+                if download_from_gcs(pdf_blob, pdf_temp):
+                    zip_file.write(pdf_temp, f"{title} - {artist} - OneSheet.pdf")
 
     zip_buffer.seek(0)
     
@@ -433,14 +444,18 @@ async def generate_promos(file_id: str, uid: str = Depends(verify_token)):
 
 
 @app.get("/api/promo-download/{file_id}/{cut_sec}")
-async def download_promo(file_id: str, cut_sec: int):
+async def download_promo(file_id: str, cut_sec: int, background_tasks: BackgroundTasks):
     """
     Streams a promo cut MP3 for download.
     """
     file_id = os.path.basename(file_id)
     blob_name = f"promos/{file_id}_{cut_sec}s.mp3"
-    local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_{cut_sec}s_dl.mp3")
+    tmp_dir = tempfile.mkdtemp()
+    local_path = os.path.join(tmp_dir, f"{file_id}_{cut_sec}s_dl.mp3")
+    background_tasks.add_task(shutil.rmtree, tmp_dir)
+
     if not download_from_gcs(blob_name, local_path):
+        shutil.rmtree(tmp_dir)
         raise HTTPException(status_code=404, detail=f"{cut_sec}s promo not found")
     tags = read_disco_metadata(local_path)
     title = tags.get("TIT2", "Track").replace("/", "-")
