@@ -63,13 +63,18 @@ def embed_disco_metadata(file_path: str, data: dict):
         audio.add(COMM(encoding=3, lang='eng', desc='Sync & Contact Info', text=comments_text))
         
         # User Defined Explicit Custom Tags (Grouping, Mood, Instruments, Energy, Valence, Danceability)
-        if data.get("grouping"): audio.add(TXXX(encoding=3, desc='Grouping', text=str(data["grouping"])))
-        if data.get("mood"): audio.add(TXXX(encoding=3, desc='Mood', text=str(data["mood"])))
-        if data.get("energy"): audio.add(TXXX(encoding=3, desc='Energy', text=str(data["energy"])))
-        if data.get("valence"): audio.add(TXXX(encoding=3, desc='Valence', text=str(data["valence"])))
-        if data.get("danceability"): audio.add(TXXX(encoding=3, desc='Danceability', text=str(data["danceability"])))
-        if data.get("instruments"): audio.add(TXXX(encoding=3, desc='Instruments', text=str(data["instruments"])))
-        if data.get("vocalPresence"): audio.add(TXXX(encoding=3, desc='Vocal Presence', text=str(data["vocalPresence"])))
+        txxx_map = {
+            "grouping": "Grouping",
+            "mood": "Mood",
+            "energy": "Energy",
+            "valence": "Valence",
+            "danceability": "Danceability",
+            "instruments": "Instruments",
+            "vocalPresence": "Vocal Presence"
+        }
+        for field, desc in txxx_map.items():
+            if data.get(field):
+                audio.add(TXXX(encoding=3, desc=desc, text=str(data[field])))
 
         audio.save(file_path, v2_version=3) # Saving as v2.3 for best cross-compatibility (DISCO/iTunes)
         return True
