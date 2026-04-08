@@ -161,10 +161,14 @@ def embed_metadata(
 
         # 7. Persistence: Store in Firestore if UID is provided
         if uid:
+            # Proactively cache the embedded tags to avoid future GCS downloads for simple tag reads
+            cached_tags = read_disco_metadata(local_mp3_path)
+
             track_doc = {
                 "uid": uid,
                 "fileId": fileId,
                 "metadata": data,
+                "cachedTags": cached_tags,
                 "downloadUrl": f"/api/download/{fileId}",
                 "oneSheetUrl": f"/api/onesheet/{fileId}",
                 "isMaster": ext != '.mp3',
@@ -316,13 +320,29 @@ async def download_onesheet(file_id: str):
 @app.get("/api/tags/{file_id}")
 async def get_tags(file_id: str):
     file_id = os.path.basename(file_id)
+
+    # 1. Check Firestore Cache
+    doc_ref = db.collection("processedTracks").document(file_id)
+    doc = doc_ref.get()
+    if doc.exists:
+        track_data = doc.to_dict()
+        if "cachedTags" in track_data:
+            return track_data["cachedTags"]
+
+    # 2. Cache Miss: Download and Parse
     blob_name = f"finalized/{file_id}.mp3"
     local_path = os.path.join(tempfile.gettempdir(), f"{file_id}_tagcheck.mp3")
     
     if not download_from_gcs(blob_name, local_path):
         raise HTTPException(status_code=404, detail="File not found")
     
-    return read_disco_metadata(local_path)
+    tags = read_disco_metadata(local_path)
+
+    # 3. Update Cache if document exists
+    if doc.exists:
+        doc_ref.update({"cachedTags": tags})
+
+    return tags
 
 @app.get("/api/export-zip")
 async def export_zip(fileIds: str):
